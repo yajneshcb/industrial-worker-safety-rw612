@@ -1,0 +1,30 @@
+# Build directory
+build/
+bin/
+*.elf
+*.bin
+*.hex
+*.axf
+*.map
+*.o
+*.obj
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# VS Code & IDE (Keep launch and tasks if needed, or exclude personal configs)
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+
+# Operating System
+.DS_Store
+Thumbs.db
+.vercel
+.env*

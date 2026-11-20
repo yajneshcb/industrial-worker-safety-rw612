@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090c11">
+  <meta name="description" content="Industrial Worker Safety Monitoring and Real-Time Hazard Alert System for NXP FRDM-RW612 edge safety node.">
+  <title>RW612 Safety Node | Mission Control Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="/static/safety-mark.svg">
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Topbar Header -->
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="RW612 Safety Node home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40" fill="none">
+            <path d="M20 3.5 34 9v10.5c0 8.3-5.7 14.5-14 17-8.3-2.5-14-8.7-14-17V9l14-5.5Z" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M10.5 21h5l2.4-5.4 4.2 9 2.4-5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="20" cy="20" r="1.3" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <strong>RW612 <span>SAFETY NODE</span></strong>
+          <small>EDGE WORKER PROTECTION</small>
+        </span>
+      </a>
+
+      <div class="project-title">
+        <span class="eyebrow">INDUSTRIAL WORKER SAFETY MONITORING</span>
+        <span class="project-board">NXP FRDM-RW612 <i>/</i> NODE 01</span>
+      </div>
+
+      <div class="topbar-right">
+        <div class="worker" title="Protected personnel identity">
+          <span class="worker-avatar">YC</span>
+          <span>
+            <strong>Worker: Yajnesh C B</strong>
+            <small>Dept: ECE · PLANT FLOOR</small>
+          </span>
+        </div>
+
+        <div class="connection-badge" id="connectionBadge" data-link="Disconnected" title="Telemetry communication state">
+          <span class="connection-dot"></span>
+          <span id="connectionText">DISCONNECTED</span>
+        </div>
+
+        <div class="clock-block" title="System local timestamp">
+          <span class="micro-label">LOCAL SYSTEM TIME</span>
+          <time id="liveClock" class="clock-value">--:--:-- --</time>
+          <span class="clock-date" id="liveDate">---</span>
+        </div>
+
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light and dark mode" title="Toggle color theme">
+          <span class="theme-icon sun-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4.5"/>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+            </svg>
+          </span>
+          <span class="theme-icon moon-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </span>
+          <span id="themeToggleLabel" class="theme-label">LIGHT</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main>
+      <!-- Masthead -->
+      <section class="masthead" aria-label="Dashboard heading">
+        <div>
+          <div class="eyebrow"><span class="live-marker"></span> SAFETY OPERATIONS <span class="slash">/</span> REAL-TIME TELEMETRY</div>
+          <h1>Worker Safety <span>Monitor</span></h1>
+        </div>
+        <div class="node-chip-badge">
+          <span class="chip-tag">FRDM-RW612</span>
+          <span class="chip-sep">/</span>
+          <span class="chip-core">CORTEX-M33 @ 260MHz</span>
+        </div>
+      </section>
+
+      <!-- Master Safety Banner (Defaults to OFFLINE until valid telemetry/simulation arrives) -->
+      <section id="masterBanner" class="master-banner state-offline" aria-live="assertive" aria-atomic="true">
+        <div class="banner-icon" aria-hidden="true">
+          <svg class="shield-icon" viewBox="0 0 24 24" fill="none">
+            <path d="M12 3 20 6v5.7c0 4.8-3.3 8.3-8 9.8-4.7-1.5-8-5-8-9.8V6l8-3Z" stroke="currentColor" stroke-width="1.5"/>
+            <path d="m8.5 12.2 2.3 2.3 4.8-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg class="offline-icon" viewBox="0 0 24 24" fill="none">
+            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg class="siren-icon" viewBox="0 0 24 24" fill="none">
+            <path d="M5 17h14l-1.5-8a5.6 5.6 0 0 0-11 0L5 17Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M3 20h18M12 2V0M4 5 2.5 3.5M20 5l1.5-1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="banner-copy">
+          <span class="banner-kicker" id="bannerKicker">EDGE CLASSIFIER STANDBY</span>
+          <h2 id="bannerTitle">NODE OFFLINE — AWAITING SENSOR TELEMETRY</h2>
+          <p id="bannerDetail">No telemetry packets received. Connect FRDM-RW612 over Wi-Fi/VCOM or trigger a bench simulation scenario below.</p>
+        </div>
+        <div class="banner-state">
+          <span class="state-light"></span>
+          <strong id="stateLabel">OFFLINE</strong>
+          <small>SAFETY STATE</small>
+        </div>
+      </section>
+
+      <!-- Section 01: Live Telemetry Cards -->
+      <section class="telemetry-section" aria-labelledby="telemetryHeading">
+        <div class="section-heading">
+          <div>
+            <span class="section-index">01</span>
+            <h2 id="telemetryHeading">Live telemetry</h2>
+            <span class="section-note">EDGE SENSOR ARRAY <b>·</b> 1s STREAM REFRESH</span>
+          </div>
+          <div class="sample-meta">
+            <span class="pulse-ring"></span>
+            <span>LAST SAMPLE <b id="sampleAge">—</b></span>
+            <span class="meta-separator"></span>
+            <span>PACKETS <b id="packetCount">—</b></span>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <!-- Card 1: Ambient Temperature -->
+          <article class="metric-card temperature-card" id="cardTemperature">
+            <div class="card-head">
+              <div class="card-title-wrap">
+                <span class="metric-icon temp-icon">°</span>
+                <div>
+                  <h3>Ambient temperature</h3>
+                  <span class="card-subtitle">P3T1755 DIGITAL SENSOR · I²C</span>
+                </div>
+              </div>
+              <span class="mini-state" id="temperatureState">NO SIGNAL</span>
+            </div>
+            <div class="temperature-layout">
+              <div class="gauge-wrap" role="img" aria-label="Temperature gauge from 0 to 60 degrees Celsius">
+                <svg class="temperature-gauge" viewBox="0 0 160 160">
+                  <circle class="gauge-track" cx="80" cy="80" r="61"/>
+                  <circle class="gauge-threshold warning" cx="80" cy="80" r="61"/>
+                  <circle class="gauge-threshold critical" cx="80" cy="80" r="61"/>
+                  <circle id="temperatureArc" class="gauge-value" cx="80" cy="80" r="61"/>
+                  <text x="80" y="77" class="gauge-number" id="temperatureGaugeValue">—</text>
+                  <text x="80" y="99" class="gauge-unit">DEG C</text>
+                  <text x="18" y="88" class="gauge-tick">0</text>
+                  <text x="142" y="88" class="gauge-tick">60</text>
+                </svg>
+              </div>
+              <div class="temperature-readout">
+                <div class="big-value">
+                  <span id="temperatureValue">—</span>
+                  <small>°C</small>
+                </div>
+                <div class="threshold-row">
+                  <span><i class="threshold-dot warning-dot"></i>WARN <b>40°</b></span>
+                  <span><i class="threshold-dot critical-dot"></i>CRITICAL <b>50°</b></span>
+                </div>
+                <div class="sparkline-box">
+                  <div class="sparkline-head">
+                    <span>RECENT TREND</span>
+                    <span>MIN <b id="temperatureMin">—</b> <i>/</i> MAX <b id="temperatureMax">—</b></span>
+                  </div>
+                  <svg class="sparkline" id="temperatureSpark" viewBox="0 0 280 44" preserveAspectRatio="none" aria-label="Recent temperature trend"></svg>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Card 2: Motion & Impact -->
+          <article class="metric-card motion-card" id="cardMotion">
+            <div class="card-head">
+              <div class="card-title-wrap">
+                <span class="metric-icon motion-icon">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    <circle cx="12" cy="12" r="2.4" fill="currentColor"/>
+                  </svg>
+                </span>
+                <div>
+                  <h3>Motion &amp; impact</h3>
+                  <span class="card-subtitle">MPU-6050 · 6-AXIS IMU</span>
+                </div>
+              </div>
+              <span class="event-counter"><b id="fallCount">—</b><small>FALL EVENTS</small></span>
+            </div>
+            <div class="motion-readout">
+              <div>
+                <span class="micro-label">ACCELERATION MAGNITUDE</span>
+                <div class="big-value">
+                  <span id="accelValue">—</span>
+                  <small>g</small>
+                </div>
+              </div>
+              <div class="motion-condition" id="motionCondition">
+                <span class="condition-led"></span>
+                <span>NO SIGNAL</span>
+              </div>
+            </div>
+            <div class="vector-list">
+              <div class="vector-row">
+                <span class="axis-label axis-x">X</span>
+                <div class="vector-track"><i id="axisBarX"></i></div>
+                <span class="axis-value" id="axisX">—</span>
+                <small>g</small>
+              </div>
+              <div class="vector-row">
+                <span class="axis-label axis-y">Y</span>
+                <div class="vector-track"><i id="axisBarY"></i></div>
+                <span class="axis-value" id="axisY">—</span>
+                <small>g</small>
+              </div>
+              <div class="vector-row">
+                <span class="axis-label axis-z">Z</span>
+                <div class="vector-track"><i id="axisBarZ"></i></div>
+                <span class="axis-value" id="axisZ">—</span>
+                <small>g</small>
+              </div>
+            </div>
+            <div class="sparkline-box motion-spark">
+              <div class="sparkline-head">
+                <span>IMPACT SIGNATURE</span>
+                <span>FREE-FALL &lt;0.4g <i>→</i> IMPACT &gt;2.5g</span>
+              </div>
+              <svg class="sparkline" id="motionSpark" viewBox="0 0 280 44" preserveAspectRatio="none" aria-label="Recent acceleration trend"></svg>
+            </div>
+          </article>
+
+          <!-- Card 3: Gas & Smoke -->
+          <article class="metric-card gas-card" id="cardGas">
+            <div class="card-head">
+              <div class="card-title-wrap">
+                <span class="metric-icon gas-icon">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M12 3c2.2 3.1 6.8 7.3 6.8 11.5a6.8 6.8 0 1 1-13.6 0C5.2 10.3 9.8 6.1 12 3Z" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M9.2 15.1a2.8 2.8 0 0 0 2.8 2.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <div>
+                  <h3>Gas &amp; smoke</h3>
+                  <span class="card-subtitle">MQ-2 · SnO₂ LPADC CHANNEL</span>
+                </div>
+              </div>
+              <span class="sensor-live" id="gasSensorLive"><i></i> LPADC</span>
+            </div>
+            <div class="gas-readout">
+              <div class="big-value">
+                <span id="gasValue">—</span>
+                <small>PPM</small>
+              </div>
+              <span class="aqi-label" id="gasQuality">OFFLINE</span>
+            </div>
+            <div class="gas-meter" role="img" aria-label="Gas concentration meter with warning at 300 PPM and critical at 600 PPM">
+              <div class="gas-zones"><i></i><i></i><i></i></div>
+              <div class="gas-track">
+                <span class="gas-marker warning-marker"><b>300</b></span>
+                <span class="gas-marker critical-marker"><b>600</b></span>
+                <span id="gasNeedle" class="gas-needle"></span>
+              </div>
+              <div class="meter-scale">
+                <span>0</span>
+                <span>300 <em>WARN</em></span>
+                <span>600 <em>CRITICAL</em></span>
+                <span>800+</span>
+              </div>
+            </div>
+            <div class="gas-legend">
+              <span><i class="safe-swatch"></i>SAFE <b>&lt;300</b></span>
+              <span><i class="warning-swatch"></i>WARN <b>300–599</b></span>
+              <span><i class="danger-swatch"></i>DANGER <b>≥600</b></span>
+            </div>
+            <div class="sparkline-box gas-spark">
+              <div class="sparkline-head">
+                <span>GAS TREND</span>
+                <span>THRESHOLD <b>300 PPM</b></span>
+              </div>
+              <svg class="sparkline" id="gasSpark" viewBox="0 0 280 38" preserveAspectRatio="none" aria-label="Recent gas concentration trend"></svg>
+            </div>
+          </article>
+
+          <!-- Card 4: Actuator Hardware Twin -->
+          <article class="metric-card actuator-card" id="cardActuator">
+            <div class="card-head">
+              <div class="card-title-wrap">
+                <span class="metric-icon actuator-icon">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M8 7h8M8 12h8M8 17h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  </svg>
+                </span>
+                <div>
+                  <h3>Actuator hardware twin</h3>
+                  <span class="card-subtitle">FRDM-RW612 · PHYSICAL MIRROR</span>
+                </div>
+              </div>
+              <span class="mirror-label">MIRROR</span>
+            </div>
+            <div class="board-stage">
+              <div class="board-board">
+                <div class="board-label">RW612 <span>NODE 01</span></div>
+                <div class="led-stack">
+                  <div class="led-unit"><i id="ledNormal" class="hardware-led green"></i><span>SAFE</span></div>
+                  <div class="led-unit"><i id="ledWarning" class="hardware-led amber"></i><span>WARN</span></div>
+                  <div class="led-unit"><i id="ledEmergency" class="hardware-led red"></i><span>ALARM</span></div>
+                </div>
+                <div class="board-circuit circuit-one"></div>
+                <div class="board-circuit circuit-two"></div>
+                <div class="board-chip">NXP<br><b>RW612</b></div>
+                <div class="board-edge"></div>
+              </div>
+              <div class="buzzer-module">
+                <div class="buzzer-dial" id="buzzerVisual">
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <strong id="buzzerStatus">BUZZER OFF</strong>
+                <small id="buzzerMode">AWAITING LINK</small>
+              </div>
+            </div>
+            <div class="actuator-footer">
+              <span><i class="sync-icon"></i>ACTUATOR STATUS</span>
+              <b id="actuatorState" class="offline">OFFLINE</b>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- Section 02: Incident & Audit Log -->
+      <section class="operations-grid" aria-label="Operations and Link diagnostics">
+        <article class="panel incident-panel">
+          <div class="panel-heading">
+            <div>
+              <div class="panel-titleline">
+                <span class="section-index">02</span>
+                <h2>Incident &amp; audit log</h2>
+              </div>
+              <p>Timestamped node events · newest first</p>
+            </div>
+            <div class="log-actions">
+              <label class="filter-wrap">
+                <span class="sr-only">Filter by hazard type</span>
+                <select id="hazardFilter">
+                  <option value="ALL">ALL HAZARDS</option>
+                  <option value="HIGH_TEMP">HIGH TEMP</option>
+                  <option value="GAS_LEAK">GAS LEAK</option>
+                  <option value="FALL_DETECTED">FALL DETECTED</option>
+                  <option value="MANUAL_SOS">MANUAL SOS</option>
+                  <option value="SENSOR_FAULT">SENSOR FAULT</option>
+                  <option value="NONE">SYSTEM / CLEAR</option>
+                </select>
+              </label>
+              <button class="icon-button" id="exportCsv" type="button" title="Export visible events as CSV">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>CSV</span>
+              </button>
+              <button class="icon-button" id="exportJson" type="button" title="Export event log as JSON">
+                <svg viewBox="0 0 24 24" fill="none">
+                  <path d="M8 4H5v16h14V8l-4-4H8Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                  <path d="M14 4v5h5M8 13h8M8 16h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                </svg>
+                <span>JSON</span>
+              </button>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>TIME / NODE</th>
+                  <th>SEVERITY</th>
+                  <th>HAZARD / EVENT</th>
+                  <th>MSG ID</th>
+                </tr>
+              </thead>
+              <tbody id="incidentRows">
+                <tr><td colspan="4" class="empty-row">Waiting for FRDM-RW612 telemetry events…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-foot">
+            <span><i class="small-live-dot"></i><span id="eventCount">0</span> / 500 EVENTS IN BUFFER</span>
+            <span>RING BUFFER <b>·</b> PERSISTENT IN-MEMORY AUDIT</span>
+          </div>
+        </article>
+
+        <!-- Section 03: Node Link Diagnostics -->
+        <article class="panel node-panel">
+          <div class="panel-heading">
+            <div>
+              <div class="panel-titleline">
+                <span class="section-index">03</span>
+                <h2>Node link diagnostics</h2>
+              </div>
+              <p>Edge connection &amp; packet transport status</p>
+            </div>
+            <span class="node-indicator" id="nodeIndicator"><i></i><span id="nodeIndicatorText">OFFLINE</span></span>
+          </div>
+          <div class="node-identity">
+            <div class="node-glyph">
+              <svg viewBox="0 0 36 36" fill="none">
+                <rect x="8" y="8" width="20" height="20" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M13 2v6m5-6v6m5-6v6M13 28v6m5-6v6m5-6v6M2 13h6m-6 5h6m-6 5h6m20-10h6m-6 5h6m-6 5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M14 14h8v8h-8z" stroke="currentColor" stroke-width="1.4"/>
+              </svg>
+            </div>
+            <div>
+              <span class="micro-label">NODE IDENTIFIER</span>
+              <strong>FRDM-RW612-NODE-01</strong>
+            </div>
+          </div>
+          <div class="node-stats">
+            <div>
+              <span>LINK STATE</span>
+              <strong id="linkStateValue">DISCONNECTED</strong>
+            </div>
+            <div>
+              <span>LINK SOURCE</span>
+              <strong id="linkSourceValue">—</strong>
+            </div>
+            <div>
+              <span>PACKETS RECEIVED</span>
+              <strong id="nodePacketCount">0</strong>
+            </div>
+            <div>
+              <span>LAST MESSAGE ID</span>
+              <strong id="messageIdValue">—</strong>
+            </div>
+            <div>
+              <span>OFFLINE QUEUE</span>
+              <strong id="queueValue">0 <small>PACKETS</small></strong>
+            </div>
+            <div>
+              <span>USB VCOM SERIAL</span>
+              <strong id="serialStatusValue">DISABLED</strong>
+            </div>
+          </div>
+          <div class="queue-track"><span id="queueBar"></span></div>
+          <div class="node-footnote" id="nodeFootnote">Node disconnected. Awaiting telemetry stream from NXP FRDM-RW612.</div>
+        </article>
+      </section>
+
+      <!-- Bench Demonstration & Hazard Simulation Console -->
+      <section class="simulation-section" aria-labelledby="simulationHeading">
+        <button class="simulation-toggle" id="simulationToggle" type="button" aria-expanded="true" aria-controls="simulationPanel">
+          <span class="sim-toggle-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="M8 5v14l11-7-11-7Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>
+            <small>BENCH DEMONSTRATION &amp; VERIFICATION</small>
+            <strong id="simulationHeading">Hazard simulation console</strong>
+          </span>
+          <span class="sim-toggle-right">
+            <i>6 TEST SCENARIOS</i>
+            <b id="simChevron">−</b>
+          </span>
+        </button>
+        <div class="simulation-panel" id="simulationPanel">
+          <div class="simulation-copy">
+            <strong>Inject controlled edge safety scenarios:</strong>
+            <span>Simulate hazard conditions to verify actuator states, telemetry charts, and audit logs. Use Reset to return to baseline or offline state.</span>
+          </div>
+          <div class="simulation-buttons">
+            <button class="sim-button sim-emergency" data-action="sos" type="button" title="Simulate manual push button SOS activation">
+              <span class="sim-btn-icon">!</span>
+              <span><b>Simulate SOS</b><small>MANUAL OVERRIDE</small></span>
+            </button>
+            <button class="sim-button" data-action="fall" type="button" title="Simulate two-stage free-fall followed by impact">
+              <span class="sim-btn-icon fall-symbol">⌁</span>
+              <span><b>Simulate fall</b><small>FREE-FALL + IMPACT</small></span>
+            </button>
+            <button class="sim-button" data-action="high_temp" type="button" title="Simulate ambient temperature exceeding 48.5 °C">
+              <span class="sim-btn-icon temp-symbol">°</span>
+              <span><b>High temperature</b><small>48.5 °C WARNING</small></span>
+            </button>
+            <button class="sim-button" data-action="gas_leak" type="button" title="Simulate combustible gas leak exceeding 550 PPM">
+              <span class="sim-btn-icon gas-symbol">≈</span>
+              <span><b>Gas leak</b><small>550 PPM WARNING</small></span>
+            </button>
+            <button class="sim-button" data-action="sensor_fault" type="button" title="Simulate sensor hardware fault / disconnect">
+              <span class="sim-btn-icon fault-symbol">×</span>
+              <span><b>Sensor fault</b><small>INPUT DISCONNECT</small></span>
+            </button>
+            <button class="sim-button sim-reset" data-action="normal" type="button" title="Clear active simulations and return to clean state">
+              <span class="sim-btn-icon">↺</span>
+              <span><b>Clear / reset</b><small>RESTORE CLEAN STATE</small></span>
+            </button>
+          </div>
+          <div class="sim-feedback" id="simulationFeedback" aria-live="polite"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div>
+        <span class="footer-mark">RW612 <b>EDGE</b></span>
+        <span>Local safety classification stays autonomous on NXP FRDM-RW612. This dashboard is a real-time SCADA telemetry mirror.</span>
+      </div>
+      <div>
+        <span>API <code>/api/status</code> · <code>/api/telemetry</code></span>
+        <span class="footer-sep">/</span>
+        <button id="audioButton" class="audio-button" type="button" title="Toggle audio alarms for high-severity hazards">
+          <span class="audio-icon">◖</span>
+          <span id="audioButtonText">AUDIO MUTED · ENABLE</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/static/js/dashboard.js" defer></script>
+</body>
+</html>

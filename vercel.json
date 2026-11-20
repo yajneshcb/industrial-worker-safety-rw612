@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/status",
+      "destination": "/api/index.py?endpoint=status"
+    },
+    {
+      "source": "/api/telemetry",
+      "destination": "/api/index.py?endpoint=telemetry"
+    },
+    {
+      "source": "/api/simulate",
+      "destination": "/api/index.py?endpoint=simulate"
+    },
+    {
+      "source": "/debug-env",
+      "destination": "/api/index.py?endpoint=debug-env"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.py?path=$1"
+    }
+  ]
+}

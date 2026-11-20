@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<configuration name="FRDM-RW612_WorkerSafety" version="14" xsi:schemaLocation="http://mcuxpresso.nxp.com/XSD/mex_configuration_14 http://mcuxpresso.nxp.com/XSD/mex_configuration_14.xsd" uuid="a63b2f15-89c5-4eb8-b57f-f4219b671a10" xmlns="http://mcuxpresso.nxp.com/XSD/mex_configuration_14" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+   <common>
+      <processor>RW612ETA2I</processor>
+      <package>RW612ETA2I</package>
+      <board>FRDM-RW612</board>
+      <mcu_data>ksdk2_0</mcu_data>
+      <core_name>cm33</core_name>
+      <core_type>Cortex-M33</core_type>
+      <core_id>cm33</core_id>
+   </common>
+   <preferences>
+      <validate_boot_memcpy_only>true</validate_boot_memcpy_only>
+      <generate_extended_information>false</generate_extended_information>
+   </preferences>
+   <tools>
+      <pins name="Pins" version="14.0" enabled="true" update_project_code="true">
+         <pins_profile>
+            <processor_version>0.0.0</processor_version>
+            <pin_labels>
+               <!-- Onboard & external hardware pin labeling based on Project Synopsis -->
+               <pin_label pin_num="GPIO_24" pin_signal="GPIO_24" label="SW2_SOS_BUTTON" identifier="SW2_SOS"/>
+               <pin_label pin_num="GPIO_16" pin_signal="GPIO_16" label="FC2_I2C_SDA_P3T1755" identifier="TEMP_SDA"/>
+               <pin_label pin_num="GPIO_17" pin_signal="GPIO_17" label="FC2_I2C_SCL_P3T1755" identifier="TEMP_SCL"/>
+               <pin_label pin_num="GPIO_0"  pin_signal="GPIO_0"  label="FC0_I2C_SDA_MPU6050" identifier="MPU_SDA"/>
+               <pin_label pin_num="GPIO_1"  pin_signal="GPIO_1"  label="FC0_I2C_SCL_MPU6050" identifier="MPU_SCL"/>
+               <pin_label pin_num="GPIO_60" pin_signal="GPIO_60" label="ADC_CH0_MQ2_GAS" identifier="MQ2_ANALOG"/>
+               <pin_label pin_num="GPIO_4"  pin_signal="GPIO_4"  label="BUZZER_OUT" identifier="BUZZER"/>
+               <pin_label pin_num="GPIO_5"  pin_signal="GPIO_5"  label="LED_NORMAL_GREEN" identifier="LED_NORMAL"/>
+               <pin_label pin_num="GPIO_6"  pin_signal="GPIO_6"  label="LED_WARNING_YELLOW" identifier="LED_WARNING"/>
+               <pin_label pin_num="GPIO_7"  pin_signal="GPIO_7"  label="LED_EMERGENCY_RED" identifier="LED_EMERGENCY"/>
+               <pin_label pin_num="GPIO_26" pin_signal="GPIO_26" label="UART_TXD_DEBUG" identifier="DEBUG_TX"/>
+               <pin_label pin_num="GPIO_27" pin_signal="GPIO_27" label="UART_RXD_DEBUG" identifier="DEBUG_RX"/>
+            </pin_labels>
+         </pins_profile>
+         <functions_list>
+            <function name="BOARD_InitPins">
+               <description>Configures pin routing and optionally pin electrical properties.</description>
+               <options>
+                  <callFromInitBoot>true</callFromInitBoot>
+                  <coreID>cm33</coreID>
+                  <enableClock>true</enableClock>
+               </options>
+               <pins/>
+            </function>
+         </functions_list>
+      </pins>
+      <clocks name="Clocks" version="12.0" enabled="true" update_project_code="true">
+         <clocks_profile>
+            <processor_version>0.0.0</processor_version>
+         </clocks_profile>
+         <clock_configurations>
+            <clock_configuration name="BOARD_BootClockRUN" id_prefix="" core_id="cm33">
+               <description>Default 260MHz System Clock RUN Mode</description>
+               <options/>
+               <dependencies/>
+               <clock_sources/>
+               <clock_outputs/>
+               <clock_settings/>
+               <called_from_default>true</called_from_default>
+            </clock_configuration>
+         </clock_configurations>
+      </clocks>
+      <periphs name="Peripherals" version="13.0" enabled="true" update_project_code="true">
+         <peripherals_profile>
+            <processor_version>0.0.0</processor_version>
+         </peripherals_profile>
+         <functional_groups>
+            <functional_group name="BOARD_InitPeripherals" uuid="7a35ea6f-d10f-4886-9a27-6df7907f12e8" called_from_default="true" id_prefix="" core="cm33">
+               <description>Initializes project peripherals</description>
+               <options/>
+               <dependencies/>
+               <instances/>
+            </functional_group>
+         </functional_groups>
+         <components/>
+      </periphs>
+      <tee name="TEE" version="4.0" enabled="false" update_project_code="true">
+         <tee_profile>
+            <processor_version>0.0.0</processor_version>
+         </tee_profile>
+      </tee>
+   </tools>
+</configuration>
+

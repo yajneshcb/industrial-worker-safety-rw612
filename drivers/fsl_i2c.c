@@ -1,10 +1,26 @@
 /*
  * Copyright 2026
  * Platform: NXP FRDM-RW612
- * NXP SDK I2C Driver Implementation
+ * Hardware Flexcomm I2C Master Driver Implementation
  */
 
 #include "fsl_i2c.h"
+
+/* Flexcomm I2C Register Bitfields */
+#define I2C_CFG_MSTEN_MASK          (1U << 0)
+#define I2C_STAT_MSTPENDING_MASK    (1U << 0)
+#define I2C_STAT_MSTSTATE_MASK      (7U << 1)
+#define I2C_STAT_MSTSTATE_IDLE      (0U << 1)
+#define I2C_STAT_MSTSTATE_RXREADY   (1U << 1)
+#define I2C_STAT_MSTSTATE_TXREADY   (2U << 1)
+#define I2C_STAT_MSTSTATE_NACKADDR  (3U << 1)
+#define I2C_STAT_MSTSTATE_NACKDATA  (4U << 1)
+
+#define I2C_MSTCTL_MSTCONTINUE_MASK (1U << 0)
+#define I2C_MSTCTL_MSTSTART_MASK    (1U << 1)
+#define I2C_MSTCTL_MSTSTOP_MASK     (1U << 2)
+
+#define I2C_TIMEOUT_CYCLES          100000U
 
 void I2C_MasterGetDefaultConfig(i2c_master_config_t *masterConfig)
 {
@@ -18,55 +34,175 @@ void I2C_MasterGetDefaultConfig(i2c_master_config_t *masterConfig)
 
 void I2C_MasterInit(I2C_Type *base, const i2c_master_config_t *masterConfig, uint32_t srcClock_Hz)
 {
-    (void)base;
-    (void)masterConfig;
-    (void)srcClock_Hz;
+    if (base == NULL || masterConfig == NULL)
+    {
+        return;
+    }
+
+    /* Configure clock divider for desired I2C baudrate */
+    if (srcClock_Hz > 0U && masterConfig->baudRate_Bps > 0U)
+    {
+        uint32_t div = srcClock_Hz / (masterConfig->baudRate_Bps * 4U);
+        if (div > 0U)
+        {
+            div -= 1U;
+        }
+        base->CLKDIV = div & 0xFFFFU;
+    }
+
+    /* Enable I2C Master operation */
+    if (masterConfig->enableMaster)
+    {
+        base->CFG = I2C_CFG_MSTEN_MASK;
+    }
+    else
+    {
+        base->CFG = 0U;
+    }
 }
 
-static uint32_t s_simTick = 0U;
+static inline status_t I2C_WaitPending(I2C_Type *base)
+{
+    volatile uint32_t timeout = I2C_TIMEOUT_CYCLES;
+    while ((!(base->STAT & I2C_STAT_MSTPENDING_MASK)) && (--timeout > 0U))
+    {
+        __asm__ volatile("nop");
+    }
+    return (timeout > 0U) ? kStatus_Success : kStatus_Timeout;
+}
 
 status_t I2C_MasterTransferBlocking(I2C_Type *base, i2c_master_transfer_t *xfer)
 {
-    (void)base;
-
-    if (xfer == NULL)
+    if (base == NULL || xfer == NULL)
     {
         return kStatus_InvalidArgument;
     }
 
-    s_simTick++;
-
-    /* Dynamic sensor acquisition: Simulates realistic environmental fluctuations */
-    if ((xfer->direction == kI2C_Read) && (xfer->data != NULL))
+    /* Wait until master interface is ready */
+    if (I2C_WaitPending(base) != kStatus_Success)
     {
-        /* P3T1755 Temp read (Addr 0x48, 2 bytes): Dynamically drifts 24.8°C to 25.7°C */
-        if (xfer->slaveAddress == 0x48U && xfer->dataSize >= 2U)
-        {
-            int16_t varCounts = (int16_t)((s_simTick % 16U) - 8); /* Small thermal drift (+-0.5°C) */
-            int16_t rawTemp   = (int16_t)(404 + varCounts);
-            uint16_t regWord  = (uint16_t)(rawTemp << 4);
+        return kStatus_Timeout;
+    }
 
-            xfer->data[0] = (uint8_t)(regWord >> 8);
-            xfer->data[1] = (uint8_t)(regWord & 0xFF);
-        }
-        /* MPU-6050 WHO_AM_I check (Addr 0x68, Reg 0x75): Return 0x68 */
-        else if (xfer->slaveAddress == 0x68U && xfer->subaddress == 0x75U)
-        {
-            xfer->data[0] = 0x68;
-        }
-        /* MPU-6050 Accel Data: Dynamically fluctuates with human micro-motion (0.98g to 1.02g) */
-        else if (xfer->slaveAddress == 0x68U && xfer->subaddress == 0x3BU && xfer->dataSize >= 6U)
-        {
-            int16_t noiseX = (int16_t)((s_simTick % 7U) * 80 - 240);
-            int16_t noiseY = (int16_t)(((s_simTick + 3U) % 7U) * 80 - 240);
-            int16_t noiseZ = (int16_t)(16384 + ((s_simTick % 11U) * 60 - 300));
+    /* 1. If subaddress is specified, write slave address (write) + subaddress first */
+    if (xfer->subaddressSize > 0U)
+    {
+        /* Send Slave Address for Write: (ADDR << 1) | 0 */
+        base->MSTDAT = (uint32_t)((xfer->slaveAddress << 1U) | 0U);
+        base->MSTCTL = I2C_MSTCTL_MSTSTART_MASK;
 
-            xfer->data[0] = (uint8_t)(noiseX >> 8); xfer->data[1] = (uint8_t)(noiseX & 0xFF);
-            xfer->data[2] = (uint8_t)(noiseY >> 8); xfer->data[3] = (uint8_t)(noiseY & 0xFF);
-            xfer->data[4] = (uint8_t)(noiseZ >> 8); xfer->data[5] = (uint8_t)(noiseZ & 0xFF);
+        if (I2C_WaitPending(base) != kStatus_Success)
+        {
+            base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+            return kStatus_Timeout;
         }
+
+        uint32_t state = base->STAT & I2C_STAT_MSTSTATE_MASK;
+        if (state != I2C_STAT_MSTSTATE_TXREADY)
+        {
+            base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+            return kStatus_Fail; /* Slave not responding (NACK) */
+        }
+
+        /* Send Subaddress byte(s) MSB first */
+        for (int8_t i = (int8_t)(xfer->subaddressSize - 1U); i >= 0; i--)
+        {
+            base->MSTDAT = (uint32_t)((xfer->subaddress >> (i * 8)) & 0xFFU);
+            base->MSTCTL = I2C_MSTCTL_MSTCONTINUE_MASK;
+
+            if (I2C_WaitPending(base) != kStatus_Success)
+            {
+                base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+                return kStatus_Timeout;
+            }
+
+            state = base->STAT & I2C_STAT_MSTSTATE_MASK;
+            if (state != I2C_STAT_MSTSTATE_TXREADY)
+            {
+                base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+                return kStatus_Fail;
+            }
+        }
+    }
+
+    /* 2. Execute Data Phase */
+    if (xfer->direction == kI2C_Write)
+    {
+        if (xfer->subaddressSize == 0U)
+        {
+            base->MSTDAT = (uint32_t)((xfer->slaveAddress << 1U) | 0U);
+            base->MSTCTL = I2C_MSTCTL_MSTSTART_MASK;
+
+            if (I2C_WaitPending(base) != kStatus_Success)
+            {
+                base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+                return kStatus_Timeout;
+            }
+
+            if ((base->STAT & I2C_STAT_MSTSTATE_MASK) != I2C_STAT_MSTSTATE_TXREADY)
+            {
+                base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+                return kStatus_Fail;
+            }
+        }
+
+        for (size_t i = 0U; i < xfer->dataSize; i++)
+        {
+            base->MSTDAT = (uint32_t)xfer->data[i];
+            base->MSTCTL = I2C_MSTCTL_MSTCONTINUE_MASK;
+
+            if (I2C_WaitPending(base) != kStatus_Success)
+            {
+                base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+                return kStatus_Timeout;
+            }
+
+            if ((base->STAT & I2C_STAT_MSTSTATE_MASK) != I2C_STAT_MSTSTATE_TXREADY)
+            {
+                base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+                return kStatus_Fail;
+            }
+        }
+
+        base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+    }
+    else /* kI2C_Read */
+    {
+        /* Generate START (or repeated START) with Slave Address (Read): (ADDR << 1) | 1 */
+        base->MSTDAT = (uint32_t)((xfer->slaveAddress << 1U) | 1U);
+        base->MSTCTL = I2C_MSTCTL_MSTSTART_MASK;
+
+        if (I2C_WaitPending(base) != kStatus_Success)
+        {
+            base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+            return kStatus_Timeout;
+        }
+
+        uint32_t state = base->STAT & I2C_STAT_MSTSTATE_MASK;
+        if (state != I2C_STAT_MSTSTATE_RXREADY)
+        {
+            base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+            return kStatus_Fail; /* Slave not responding on read address */
+        }
+
+        for (size_t i = 0U; i < xfer->dataSize; i++)
+        {
+            if (i > 0U)
+            {
+                base->MSTCTL = I2C_MSTCTL_MSTCONTINUE_MASK;
+                if (I2C_WaitPending(base) != kStatus_Success)
+                {
+                    base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
+                    return kStatus_Timeout;
+                }
+            }
+
+            xfer->data[i] = (uint8_t)(base->MSTDAT & 0xFFU);
+        }
+
+        /* Complete read by asserting STOP */
+        base->MSTCTL = I2C_MSTCTL_MSTSTOP_MASK;
     }
 
     return kStatus_Success;
 }
-

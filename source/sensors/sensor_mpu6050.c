@@ -100,7 +100,7 @@ void SENSOR_MPU6050_Init(void)
     i2c_master_config_t masterConfig;
     uint8_t whoami = 0U;
 
-    /* Attach clock to Flexcomm 0 and initialize I2C master */
+    /* Attach clock to Flexcomm 2 and initialize I2C master */
     CLOCK_AttachClk(BOARD_MPU6050_I2C_CLK_ATTACH);
     I2C_MasterGetDefaultConfig(&masterConfig);
     masterConfig.baudRate_Bps = BOARD_MPU6050_I2C_BAUDRATE;

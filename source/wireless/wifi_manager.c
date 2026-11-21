@@ -63,19 +63,10 @@ bool WIFI_Manager_IsConnected(void)
 
 void WIFI_Manager_Process(void)
 {
-    /* If connection is dropped, simulate automatic reconnect logic */
+    /* Maintain wireless connection state */
     if (!g_wifiConnected)
     {
-        g_wifiStatus = WIRELESS_STATUS_CONNECTING;
-        g_wifiReconnectAttempts++;
-
-        /* Automatically recover connection after 30 cycles (3 seconds) */
-        if (g_wifiReconnectAttempts >= 30U)
-        {
-            g_wifiConnected         = true;
-            g_wifiStatus            = WIRELESS_STATUS_CONNECTED;
-            g_wifiReconnectAttempts = 0U;
-        }
+        g_wifiStatus = WIRELESS_STATUS_DISCONNECTED;
     }
     else
     {

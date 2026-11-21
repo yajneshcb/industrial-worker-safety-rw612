@@ -5,6 +5,7 @@
  */
 
 #include "sensor_gas.h"
+#include "board.h"
 #include "app_config.h"
 #include <stddef.h>
 
@@ -13,41 +14,59 @@
  ******************************************************************************/
 #define MQ2_ADC_MAX_COUNTS       4095.0f   /* 12-bit ADC resolution */
 #define MQ2_VREF_VOLTS           3.3f      /* ADC Reference Voltage */
-#define MQ2_CLEAN_AIR_BASELINE   450U      /* Clean ambient air raw ADC counts (~45 PPM) */
 
-/* Global simulation control for testing */
-volatile uint32_t g_gasLeakSimulation = 0U; /* 0=Normal, 1=Warning (>300 PPM), 2=Emergency (>600 PPM) */
+#define GAS_SENSOR_FAULT_THRESHOLD 5U
 
-static uint32_t s_gasTick           = 0U;
 static uint32_t s_gasConsecutiveErr = 0U;
 static uint32_t s_gasTotalErr       = 0U;
-#define GAS_SENSOR_FAULT_THRESHOLD  5U
+static bool     s_gasInitialized    = false;
 
 /*******************************************************************************
- * Driver Implementations
+ * NXP RW612 LPADC0 Hardware Register Definitions
+ * Base Address: 0x400A1000U (LPADC0)
+ * Channel 0 is routed to GPIO_60 (Header J3 Pin 2 / Arduino A0)
  ******************************************************************************/
+#define LPADC0_BASE             0x400A1000U
+#define LPADC0_CTRL             (*(volatile uint32_t *)(LPADC0_BASE + 0x08U))
+#define LPADC0_STAT             (*(volatile uint32_t *)(LPADC0_BASE + 0x0CU))
+#define LPADC0_CFG              (*(volatile uint32_t *)(LPADC0_BASE + 0x18U))
+#define LPADC0_SWTRIG           (*(volatile uint32_t *)(LPADC0_BASE + 0x20U))
+#define LPADC0_CMD1             (*(volatile uint32_t *)(LPADC0_BASE + 0x28U))
+#define LPADC0_RESFIFO          (*(volatile uint32_t *)(LPADC0_BASE + 0x300U))
+#define LPADC0_FCTRL            (*(volatile uint32_t *)(LPADC0_BASE + 0x304U))
+
+static void RecordFailure(GasSensorData_t *out_data)
+{
+    s_gasConsecutiveErr++;
+    s_gasTotalErr++;
+
+    if (out_data != NULL)
+    {
+        out_data->raw_adc_value = 0U;
+        out_data->voltage_v     = 0.0f;
+        out_data->gas_ppm       = 0.0f;
+        out_data->is_valid      = false;
+    }
+}
 
 void SENSOR_Gas_Init(void)
 {
-    /* Initialize baseline calibration, fault counters and simulation state */
-    g_gasLeakSimulation = 0U;
-    s_gasTick           = 0U;
     s_gasConsecutiveErr = 0U;
     s_gasTotalErr       = 0U;
+
+    /* Initialize hardware LPADC0: Enable ADC and configure Command 1 for Channel 0 */
+    LPADC0_CTRL = (1U << 0); /* ADC Enable */
+    LPADC0_CFG  = 0U;        /* Default 12-bit single-ended mode */
+    LPADC0_CMD1 = (BOARD_MQ2_ADC_CHANNEL & 0x1FU); /* Channel 0 (GPIO_60) */
+
+    s_gasInitialized = true;
 }
 
 float SENSOR_Gas_RawToPpm(uint32_t raw_adc)
 {
-    /* 
-     * Converts raw 12-bit ADC voltage into gas concentration (PPM).
-     * Linearized approximation calibrated for MQ-2 SnO2 sensor:
-     * Clean air (raw ~ 450) -> ~45 PPM
-     * Warning threshold (raw ~ 1800) -> ~300 PPM
-     * Critical leak (raw ~ 2800) -> ~600+ PPM
-     */
     float voltage = ((float)raw_adc / MQ2_ADC_MAX_COUNTS) * MQ2_VREF_VOLTS;
 
-    /* Gas curve scaling factor */
+    /* Gas curve scaling factor for MQ-2 SnO2 sensor */
     float ppm = (voltage / MQ2_VREF_VOLTS) * 1000.0f;
 
     if (ppm < 10.0f)
@@ -64,27 +83,32 @@ bool SENSOR_Gas_Read(GasSensorData_t *out_data)
         return false;
     }
 
-    s_gasTick++;
+    if (!s_gasInitialized)
+    {
+        RecordFailure(out_data);
+        return false;
+    }
 
-    uint32_t rawCounts;
+    /* Trigger LPADC conversion on Channel 0 */
+    LPADC0_SWTRIG = (1U << 0);
 
-    /* Evaluate simulation mode or real ADC input */
-    if (g_gasLeakSimulation == 1U)
+    /* Wait for conversion completion in RESFIFO */
+    volatile uint32_t timeout = 50000U;
+    while (((LPADC0_FCTRL & 0x1FU) == 0U) && (--timeout > 0U))
     {
-        /* Warning scenario: Moderate smoke/gas leak (~385 PPM) */
-        rawCounts = 1600U + ((s_gasTick % 7U) * 15U);
+        __asm__ volatile("nop");
     }
-    else if (g_gasLeakSimulation == 2U)
+
+    if (timeout == 0U)
     {
-        /* Emergency scenario: Heavy toxic gas leak / fire smoke (~720 PPM) */
-        rawCounts = 2950U + ((s_gasTick % 9U) * 20U);
+        /* ADC conversion timeout or hardware not responding */
+        RecordFailure(out_data);
+        return false;
     }
-    else
-    {
-        /* Normal clean ambient air: Slight natural atmospheric fluctuation (42 to 48 PPM) */
-        int32_t drift = (int32_t)((s_gasTick % 13U) * 4) - 24;
-        rawCounts = (uint32_t)((int32_t)MQ2_CLEAN_AIR_BASELINE + drift);
-    }
+
+    /* Read converted raw 12-bit ADC result */
+    uint32_t fifoWord = LPADC0_RESFIFO;
+    uint32_t rawCounts = (fifoWord >> 3U) & 0x0FFFU;
 
     float voltage = ((float)rawCounts / MQ2_ADC_MAX_COUNTS) * MQ2_VREF_VOLTS;
     float ppm     = SENSOR_Gas_RawToPpm(rawCounts);
@@ -96,11 +120,6 @@ bool SENSOR_Gas_Read(GasSensorData_t *out_data)
     s_gasConsecutiveErr     = 0U;
 
     return true;
-}
-
-void SENSOR_Gas_SetSimulationMode(uint32_t mode)
-{
-    g_gasLeakSimulation = mode;
 }
 
 bool SENSOR_Gas_IsFaulted(void)

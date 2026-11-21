@@ -77,18 +77,18 @@
 
   function drawEmptySparkline(svg, placeholderText) {
     if (!svg) return;
-    const width = 280, height = 40;
+    const width = 280, height = 58;
     const theme = getCurrentTheme();
     const strokeColor = themeColors[theme].placeholder;
     svg.innerHTML = `
       <line x1="4" y1="${height / 2}" x2="${width - 4}" y2="${height / 2}" stroke="${strokeColor}" stroke-dasharray="4 5" stroke-width="1.2" opacity="0.6"/>
-      <text x="${width / 2}" y="${height / 2 + 12}" fill="${strokeColor}" font-size="7" font-family="'DM Mono', monospace" text-anchor="middle" letter-spacing="0.08em">${escapeHTML(placeholderText || 'AWAITING SENSOR LINK')}</text>
+      <text x="${width / 2}" y="${height / 2 + 14}" fill="${strokeColor}" font-size="9" font-family="'DM Mono', monospace" text-anchor="middle" letter-spacing="0.08em">${escapeHTML(placeholderText || 'AWAITING SENSOR LINK')}</text>
     `;
   }
 
   function drawSparkline(svg, values, color, threshold = null, pointStroke = null) {
     if (!svg) return;
-    const width = 280, height = 40, pad = 3;
+    const width = 280, height = 58, pad = 4;
     const list = (values || []).slice(-40).map(Number).filter(Number.isFinite);
     if (!list.length) {
       drawEmptySparkline(svg, 'AWAITING STREAM');
@@ -136,7 +136,7 @@
     state.data = data;
     const isConnected = data.link_state === 'Connected';
     const hasTelemetry = Boolean(data.has_telemetry && data.temperature_c !== null);
-    const isActive = isConnected || hasTelemetry || (data.link_source === 'Simulation');
+    const isActive = Boolean(isConnected && hasTelemetry);
 
     const badge = $('#connectionBadge');
     const banner = $('#masterBanner');
@@ -156,7 +156,7 @@
       $('#stateLabel').textContent = 'OFFLINE';
       $('#bannerKicker').textContent = 'EDGE CLASSIFIER STANDBY';
       $('#bannerTitle').textContent = 'NODE OFFLINE — AWAITING SENSOR TELEMETRY';
-      $('#bannerDetail').textContent = 'FRDM-RW612 is disconnected. Awaiting real-time telemetry over Wi-Fi / USB VCOM, or inject a controlled test scenario from the bench console below.';
+      $('#bannerDetail').textContent = 'Awaiting real-time telemetry over Wi-Fi / USB VCOM.';
 
       // Section 01: Ambient Temperature card
       $('#temperatureValue').textContent = '—';
@@ -229,7 +229,7 @@
     }
 
     // ==========================================
-    // CASE 2: ACTIVE TELEMETRY / SIMULATED EVENT
+    // CASE 2: ACTIVE HARDWARE TELEMETRY
     // ==========================================
     const safety = ['NORMAL', 'WARNING', 'EMERGENCY'].includes(data.safety_state) ? data.safety_state : 'NORMAL';
     const hazard = String(data.hazard_type || 'NONE');
@@ -366,7 +366,7 @@
     $('#queueValue').innerHTML = `${queued} <small>PACKETS</small>`;
     $('#queueBar').style.width = `${Math.min(100, queued / 1000 * 100)}%`;
     $('#serialStatusValue').textContent = (data.serial_status || 'Disabled').toUpperCase();
-    $('#nodeFootnote').textContent = link === 'Connected' ? `Telemetry source ${data.link_source || 'unknown'} · latest message ID: ${data.id ?? 'pending'}.` : link === 'Reconnecting' ? 'Wireless link interrupted — buffered packets may be queued on the edge node.' : link === 'Buffered' ? `${queued} packet(s) buffered locally while the wireless link is unavailable.` : 'Awaiting node or simulator packet.';
+    $('#nodeFootnote').textContent = link === 'Connected' ? `Telemetry source ${data.link_source || 'unknown'} · latest message ID: ${data.id ?? 'pending'}.` : link === 'Reconnecting' ? 'Wireless link interrupted — buffered packets may be queued on the edge node.' : link === 'Buffered' ? `${queued} packet(s) buffered locally while the wireless link is unavailable.` : 'Awaiting node telemetry packet.';
   }
 
   function renderIncidents(incidents) {
@@ -400,33 +400,6 @@
     }
   }
 
-  async function simulate(action, button) {
-    const buttons = [...document.querySelectorAll('.sim-button')];
-    buttons.forEach((item) => { item.disabled = true; });
-    $('#simulationFeedback').textContent = `INJECTING ${action.replaceAll('_', ' ').toUpperCase()} EVENT…`;
-    try {
-      const response = await fetch('/api/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ action }) });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
-      renderStatus(body.data);
-      const labels = {
-        sos: 'Manual SOS emergency scenario injected.',
-        fall: 'Free-fall + 2.85 g impact scenario injected.',
-        high_temp: '48.5 °C temperature warning scenario injected.',
-        gas_leak: '550 PPM gas warning scenario injected.',
-        sensor_fault: 'Sensor input fault scenario injected.',
-        normal: 'Simulation cleared — state returned to clean baseline.'
-      };
-      $('#simulationFeedback').textContent = `✓ ${labels[action] || 'Simulation event injected.'}`;
-      showToast(labels[action] || 'Simulation event injected.');
-    } catch (error) {
-      $('#simulationFeedback').textContent = `× Simulation failed: ${error.message}`;
-      showToast(`Simulation failed: ${error.message}`);
-    } finally {
-      buttons.forEach((item) => { item.disabled = false; });
-    }
-  }
-
   function downloadFile(filename, text, mime) {
     const blob = new Blob([text], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -448,13 +421,6 @@
   function exportJSON() {
     downloadFile(`rw612-incidents-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(state.incidents, null, 2), 'application/json');
     showToast(`Exported ${state.incidents.length} event(s) to JSON.`);
-  }
-
-  function toggleSimulation() {
-    const section = $('.simulation-section');
-    const collapsed = section.classList.toggle('collapsed');
-    $('#simulationToggle').setAttribute('aria-expanded', String(!collapsed));
-    $('#simChevron').textContent = collapsed ? '+' : '−';
   }
 
   function stopAudio() {
@@ -535,11 +501,9 @@
   }
 
   function bindEvents() {
-    document.querySelectorAll('.sim-button').forEach((button) => button.addEventListener('click', () => simulate(button.dataset.action, button)));
     $('#hazardFilter').addEventListener('change', () => renderIncidents(state.incidents));
     $('#exportCsv').addEventListener('click', exportCSV);
     $('#exportJson').addEventListener('click', exportJSON);
-    $('#simulationToggle').addEventListener('click', toggleSimulation);
     $('#audioButton').addEventListener('click', toggleAudio);
 
     const themeBtn = $('#themeToggle');

@@ -84,7 +84,7 @@
         </div>
       </section>
 
-      <!-- Master Safety Banner (Defaults to OFFLINE until valid telemetry/simulation arrives) -->
+      <!-- Master Safety Banner (Defaults to OFFLINE until valid hardware telemetry arrives) -->
       <section id="masterBanner" class="master-banner state-offline" aria-live="assertive" aria-atomic="true">
         <div class="banner-icon" aria-hidden="true">
           <svg class="shield-icon" viewBox="0 0 24 24" fill="none">
@@ -102,7 +102,7 @@
         <div class="banner-copy">
           <span class="banner-kicker" id="bannerKicker">EDGE CLASSIFIER STANDBY</span>
           <h2 id="bannerTitle">NODE OFFLINE — AWAITING SENSOR TELEMETRY</h2>
-          <p id="bannerDetail">No telemetry packets received. Connect FRDM-RW612 over Wi-Fi/VCOM or trigger a bench simulation scenario below.</p>
+          <p id="bannerDetail">Awaiting real-time telemetry over Wi-Fi / USB VCOM.</p>
         </div>
         <div class="banner-state">
           <span class="state-light"></span>
@@ -167,7 +167,7 @@
                     <span>RECENT TREND</span>
                     <span>MIN <b id="temperatureMin">—</b> <i>/</i> MAX <b id="temperatureMax">—</b></span>
                   </div>
-                  <svg class="sparkline" id="temperatureSpark" viewBox="0 0 280 44" preserveAspectRatio="none" aria-label="Recent temperature trend"></svg>
+                  <svg class="sparkline" id="temperatureSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent temperature trend"></svg>
                 </div>
               </div>
             </div>
@@ -228,7 +228,7 @@
                 <span>IMPACT SIGNATURE</span>
                 <span>FREE-FALL &lt;0.4g <i>→</i> IMPACT &gt;2.5g</span>
               </div>
-              <svg class="sparkline" id="motionSpark" viewBox="0 0 280 44" preserveAspectRatio="none" aria-label="Recent acceleration trend"></svg>
+              <svg class="sparkline" id="motionSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent acceleration trend"></svg>
             </div>
           </article>
 
@@ -280,7 +280,7 @@
                 <span>GAS TREND</span>
                 <span>THRESHOLD <b>300 PPM</b></span>
               </div>
-              <svg class="sparkline" id="gasSpark" viewBox="0 0 280 38" preserveAspectRatio="none" aria-label="Recent gas concentration trend"></svg>
+              <svg class="sparkline" id="gasSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent gas concentration trend"></svg>
             </div>
           </article>
 
@@ -444,58 +444,6 @@
           <div class="queue-track"><span id="queueBar"></span></div>
           <div class="node-footnote" id="nodeFootnote">Node disconnected. Awaiting telemetry stream from NXP FRDM-RW612.</div>
         </article>
-      </section>
-
-      <!-- Bench Demonstration & Hazard Simulation Console -->
-      <section class="simulation-section" aria-labelledby="simulationHeading">
-        <button class="simulation-toggle" id="simulationToggle" type="button" aria-expanded="true" aria-controls="simulationPanel">
-          <span class="sim-toggle-icon">
-            <svg viewBox="0 0 24 24" fill="none">
-              <path d="M8 5v14l11-7-11-7Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-            </svg>
-          </span>
-          <span>
-            <small>BENCH DEMONSTRATION &amp; VERIFICATION</small>
-            <strong id="simulationHeading">Hazard simulation console</strong>
-          </span>
-          <span class="sim-toggle-right">
-            <i>6 TEST SCENARIOS</i>
-            <b id="simChevron">−</b>
-          </span>
-        </button>
-        <div class="simulation-panel" id="simulationPanel">
-          <div class="simulation-copy">
-            <strong>Inject controlled edge safety scenarios:</strong>
-            <span>Simulate hazard conditions to verify actuator states, telemetry charts, and audit logs. Use Reset to return to baseline or offline state.</span>
-          </div>
-          <div class="simulation-buttons">
-            <button class="sim-button sim-emergency" data-action="sos" type="button" title="Simulate manual push button SOS activation">
-              <span class="sim-btn-icon">!</span>
-              <span><b>Simulate SOS</b><small>MANUAL OVERRIDE</small></span>
-            </button>
-            <button class="sim-button" data-action="fall" type="button" title="Simulate two-stage free-fall followed by impact">
-              <span class="sim-btn-icon fall-symbol">⌁</span>
-              <span><b>Simulate fall</b><small>FREE-FALL + IMPACT</small></span>
-            </button>
-            <button class="sim-button" data-action="high_temp" type="button" title="Simulate ambient temperature exceeding 48.5 °C">
-              <span class="sim-btn-icon temp-symbol">°</span>
-              <span><b>High temperature</b><small>48.5 °C WARNING</small></span>
-            </button>
-            <button class="sim-button" data-action="gas_leak" type="button" title="Simulate combustible gas leak exceeding 550 PPM">
-              <span class="sim-btn-icon gas-symbol">≈</span>
-              <span><b>Gas leak</b><small>550 PPM WARNING</small></span>
-            </button>
-            <button class="sim-button" data-action="sensor_fault" type="button" title="Simulate sensor hardware fault / disconnect">
-              <span class="sim-btn-icon fault-symbol">×</span>
-              <span><b>Sensor fault</b><small>INPUT DISCONNECT</small></span>
-            </button>
-            <button class="sim-button sim-reset" data-action="normal" type="button" title="Clear active simulations and return to clean state">
-              <span class="sim-btn-icon">↺</span>
-              <span><b>Clear / reset</b><small>RESTORE CLEAN STATE</small></span>
-            </button>
-          </div>
-          <div class="sim-feedback" id="simulationFeedback" aria-live="polite"></div>
-        </div>
       </section>
     </main>
 

@@ -105,15 +105,11 @@ Manual SOS & SW2 pressed (active low) & Emergency at once, highest priority \\
 \label{sec:hardware}
 
 \subsection{Board and Sensors}
-The RW612 microcontroller on the FRDM-RW612 has an Arm Cortex-M33 core and Wi-Fi 6, Bluetooth Low Energy (BLE) 5.3 and IEEE 802.15.4 radios \cite{nxpboard}. The firmware sets the core clock to 260 MHz. The P3T1755 returns a 12-bit two's complement temperature with a resolution of 0.0625 \textdegree C per step, and the driver reads it over the inter-integrated circuit (I$^2$C) bus at address 0x48. The MPU-6050 sits at address 0x68 and is configured for a full scale of $\pm$2 g on the accelerometer and $\pm$250 degrees per second on the gyroscope. The MQ-2 analog output feeds channel 0 of the 12-bit low-power analog-to-digital converter (LPADC) on general-purpose input/output (GPIO) pin 60, with a 3.3 V reference. Its heater runs from the 5 V rail, and the module is suited to demonstrating gas detection but is not a certified industrial gas detector.
+The RW612 microcontroller on the FRDM-RW612 has an Arm Cortex-M33 core and Wi-Fi 6, Bluetooth Low Energy (BLE) 5.3 and IEEE 802.15.4 radios \cite{nxpboard}. The firmware sets the core clock to 260 MHz. The P3T1755 returns a 12-bit two's complement temperature with a resolution of 0.0625 \textdegree C per step, and the driver reads it over the inter-integrated circuit (I$^2$C) bus at address 0x48. The MPU-6050 sits at address 0x68 and is configured for a full scale of $\pm$8 g on the accelerometer (to reliably capture impact peaks above 2.5 g) and $\pm$250 degrees per second on the gyroscope. The MQ-2 analog output feeds channel 0 of the 12-bit low-power analog-to-digital converter (LPADC) on general-purpose input/output (GPIO) pin 60, with a 3.3 V reference. Its heater runs from the 5 V rail, and the module is suited to demonstrating gas detection but is not a certified industrial gas detector.
 
 \subsection{Actuators and Pin Assignment}
 Three 5 mm LEDs in green, yellow and red with 220 $\Omega$ series resistors show the node state, and an active buzzer module with its own driver transistor gives the audible alarm. Table~\ref{tab:pins} gives the pin assignment used by the firmware. The two I$^2$C devices share one bus, which is possible because their addresses differ. The debug console uses the MCU-Link virtual serial port at 115200 baud.
 
-% VERIFY(author): board.h puts the MPU-6050 on Flexcomm 2 (GPIO 16/17), while
-% docs/pinout_mapping.md, README.md and the card label in dashboard_app.py say
-% Flexcomm 0 (GPIO 0/1). Keep this table in line with the wiring that is
-% actually on your breadboard, and make the other three files agree with it.
 \begin{table}[!t]
 \caption{Pin assignment}
 \label{tab:pins}

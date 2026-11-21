@@ -10,25 +10,22 @@
 /*******************************************************************************
  * Button SOS State & Hardware Read (Port 0 Pin 24)
  * Active Low input with internal pull-up.
- * Supports both interrupt latching and polled read.
+ * Latches for 5.0 seconds (50 ticks @ 100ms) upon press, then auto-clears.
  ******************************************************************************/
 #define HW_GPIO_PORT0_PIN    (*(volatile uint32_t *)(0x40102100U))
+#define SOS_LATCH_TICKS      50U /* 5.0 seconds emergency hold */
 
-volatile bool g_manualSosTrigger = false;
-static bool   s_buttonLatched    = false;
+static uint32_t s_sosLatchCountdown = 0U;
 
-/* Interrupt Service Routine for GPIO Pin Interrupt (PINT / GPIO_INTA) */
 void BUTTON_SOS_IRQHandler(void)
 {
     /* Falling edge detected (button pressed to GND) */
-    g_manualSosTrigger = true;
-    s_buttonLatched    = true;
+    s_sosLatchCountdown = SOS_LATCH_TICKS;
 }
 
 void BUTTON_SOS_Init(void)
 {
-    g_manualSosTrigger = false;
-    s_buttonLatched    = false;
+    s_sosLatchCountdown = 0U;
 }
 
 bool BUTTON_SOS_IsPressed(void)
@@ -38,15 +35,17 @@ bool BUTTON_SOS_IsPressed(void)
 
     if (physicalPressed)
     {
-        s_buttonLatched = true;
+        s_sosLatchCountdown = SOS_LATCH_TICKS;
+    }
+    else if (s_sosLatchCountdown > 0U)
+    {
+        s_sosLatchCountdown--;
     }
 
-    return (g_manualSosTrigger || s_buttonLatched || physicalPressed);
+    return (physicalPressed || (s_sosLatchCountdown > 0U));
 }
 
 void BUTTON_SOS_Clear(void)
 {
-    g_manualSosTrigger = false;
-    s_buttonLatched    = false;
+    s_sosLatchCountdown = 0U;
 }
-

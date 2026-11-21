@@ -28,3 +28,6 @@ ENV/
 Thumbs.db
 .vercel
 .env*
+.codex/
+scratch/
+

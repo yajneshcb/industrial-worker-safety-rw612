@@ -14,15 +14,13 @@
 extern "C" {
 #endif
 
-extern volatile bool g_manualSosTrigger;
-
 void BUTTON_SOS_Init(void);
 bool BUTTON_SOS_IsPressed(void);
 void BUTTON_SOS_Clear(void);
+void BUTTON_SOS_IRQHandler(void);
 
 #if defined(__cplusplus)
 }
 #endif
 
 #endif /* _BUTTON_SOS_H_ */
-

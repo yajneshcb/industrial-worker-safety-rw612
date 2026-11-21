@@ -43,7 +43,6 @@ volatile uint32_t g_safetyState          = SAFETY_STATE_NORMAL;
 /* Primary Hazard (0=NONE, 1=HIGH_TEMP, 2=GAS_LEAK, 3=FALL, 4=SOS) */
 volatile uint32_t g_primaryHazard        = HAZARD_NONE;
 volatile uint32_t g_fallEventCount       = 0U;
-volatile bool     g_manualWarningTrigger = false;
 
 /*******************************************************************************
  * Application Prototypes & Local State
@@ -219,13 +218,6 @@ static void App_ProcessSafetyLogic(void)
 {
     bool sosActive = BUTTON_SOS_IsPressed();
     s_lastEvaluation = SAFETY_Decision_Evaluate(&s_currentTemp, &s_currentMpu, &s_currentGas, sosActive);
-
-    /* Manual warning trigger override for interactive demonstration */
-    if (g_manualWarningTrigger && (s_lastEvaluation.state < SAFETY_STATE_WARNING))
-    {
-        s_lastEvaluation.state          = SAFETY_STATE_WARNING;
-        s_lastEvaluation.primary_hazard = HAZARD_HIGH_TEMPERATURE;
-    }
 
     g_safetyState   = (uint32_t)s_lastEvaluation.state;
     g_primaryHazard = (uint32_t)s_lastEvaluation.primary_hazard;

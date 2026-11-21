@@ -407,7 +407,7 @@ class TelemetryStore:
 
     def snapshot_locked(self) -> dict[str, Any]:
         # 3.0s Heartbeat Watchdog: If no fresh packet has arrived within 3.0s, transition to OFFLINE
-        if self.state.get("has_telemetry", False) and self.state.get("link_source") != "Simulation":
+        if self.state.get("has_telemetry", False):
             if self.last_sample_time is not None and (time.monotonic() - self.last_sample_time > 3.0):
                 self.reset_to_disconnected()
 
@@ -422,48 +422,6 @@ class TelemetryStore:
     def snapshot(self) -> dict[str, Any]:
         with self.lock:
             return self.snapshot_locked()
-
-    def simulate(self, action: str) -> dict[str, Any]:
-        baseline = {
-            "id": f"SIM-{epoch_ms()}",
-            "temp": 24.6,
-            "accel": 1.0,
-            "accel_x": 0.02,
-            "accel_y": 0.03,
-            "accel_z": 0.999,
-            "gas": 48.0,
-            "state": "NORMAL",
-            "hazard": "NONE",
-            "sos": False,
-            "sensor_fault": False,
-            "offline_queue_count": 0,
-            "buffered": False,
-            "link_state": "Connected",
-            "link_source": "Simulation",
-        }
-        if action == "sos":
-            sample = {**baseline, "id": f"SIM-SOS-{epoch_ms()}", "sos": True, "state": "EMERGENCY", "hazard": "MANUAL_SOS"}
-            return self.ingest(sample, "simulator")
-        if action == "fall":
-            self.ingest({**baseline, "id": f"SIM-FREEFALL-{epoch_ms()}", "accel": 0.12, "accel_x": 0.01, "accel_y": 0.02, "accel_z": 0.115}, "simulator")
-            time.sleep(0.12)
-            return self.ingest({**baseline, "id": f"SIM-IMPACT-{epoch_ms()}", "accel": 2.85, "accel_x": 1.94, "accel_y": 1.31, "accel_z": 1.61, "state": "EMERGENCY", "hazard": "FALL_DETECTED"}, "simulator")
-        if action == "high_temp":
-            return self.ingest({**baseline, "id": f"SIM-TEMP-{epoch_ms()}", "temp": 48.5, "state": "WARNING", "hazard": "HIGH_TEMP"}, "simulator")
-        if action == "gas_leak":
-            return self.ingest({**baseline, "id": f"SIM-GAS-{epoch_ms()}", "gas": 550.0, "state": "WARNING", "hazard": "GAS_LEAK"}, "simulator")
-        if action == "sensor_fault":
-            return self.ingest({**baseline, "id": f"SIM-FAULT-{epoch_ms()}", "sensor_fault": True, "state": "WARNING", "hazard": "SENSOR_FAULT"}, "simulator")
-        if action == "normal":
-            # If real hardware telemetry is active, reset latched faults but maintain link
-            if self.last_hardware_sample_time is not None and time.monotonic() - self.last_hardware_sample_time <= 5.0:
-                with self.lock:
-                    self.fall_latch_until = 0.0
-                    self.freefall_time = None
-                return self.snapshot()
-            # Otherwise return cleanly to the un-connected / awaiting telemetry state per specification
-            return self.reset_to_disconnected()
-        raise ValueError("action must be one of: sos, fall, high_temp, gas_leak, sensor_fault, normal")
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -603,13 +561,7 @@ def post_telemetry():
 @app.route("/api/simulate", methods=["POST"])
 @app.route("/api/index/api/simulate", methods=["POST"])
 def simulate():
-    payload = request.get_json(silent=True) or {}
-    action = str(payload.get("action", "")).strip().lower()
-    try:
-        result = store.simulate(action)
-        return jsonify({"ok": True, "action": action, "data": result})
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    return jsonify({"error": "Simulation disabled: live hardware telemetry only"}), 403
 
 
 def serial_reader() -> None:

@@ -20,10 +20,8 @@
             <pin_labels>
                <!-- Onboard & external hardware pin labeling based on Project Synopsis -->
                <pin_label pin_num="GPIO_24" pin_signal="GPIO_24" label="SW2_SOS_BUTTON" identifier="SW2_SOS"/>
-               <pin_label pin_num="GPIO_16" pin_signal="GPIO_16" label="FC2_I2C_SDA_P3T1755" identifier="TEMP_SDA"/>
-               <pin_label pin_num="GPIO_17" pin_signal="GPIO_17" label="FC2_I2C_SCL_P3T1755" identifier="TEMP_SCL"/>
-               <pin_label pin_num="GPIO_0"  pin_signal="GPIO_0"  label="FC0_I2C_SDA_MPU6050" identifier="MPU_SDA"/>
-               <pin_label pin_num="GPIO_1"  pin_signal="GPIO_1"  label="FC0_I2C_SCL_MPU6050" identifier="MPU_SCL"/>
+               <pin_label pin_num="GPIO_16" pin_signal="GPIO_16" label="FC2_I2C_SDA_P3T1755_MPU6050" identifier="I2C2_SDA"/>
+               <pin_label pin_num="GPIO_17" pin_signal="GPIO_17" label="FC2_I2C_SCL_P3T1755_MPU6050" identifier="I2C2_SCL"/>
                <pin_label pin_num="GPIO_60" pin_signal="GPIO_60" label="ADC_CH0_MQ2_GAS" identifier="MQ2_ANALOG"/>
                <pin_label pin_num="GPIO_4"  pin_signal="GPIO_4"  label="BUZZER_OUT" identifier="BUZZER"/>
                <pin_label pin_num="GPIO_5"  pin_signal="GPIO_5"  label="LED_NORMAL_GREEN" identifier="LED_NORMAL"/>

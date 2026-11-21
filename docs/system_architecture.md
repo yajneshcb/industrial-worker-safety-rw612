@@ -43,7 +43,7 @@ Motion / Fall   Hazard           (SOS)
 
 1. **Acquisition Stage:**
    - Polling of P3T1755 temperature sensor via Flexcomm 2 I2C.
-   - Polling of MPU-6050 accelerometer & gyroscope via Flexcomm 0 I2C.
+   - Polling of MPU-6050 accelerometer & gyroscope via Flexcomm 2 I2C (shared bus).
    - Sampling of MQ-2 gas concentration via LPADC.
    - Interrupt/latch monitoring of SW2 user push button (SOS).
 

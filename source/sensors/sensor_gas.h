@@ -20,9 +20,6 @@ typedef struct {
     bool     is_valid;
 } GasSensorData_t;
 
-/* Global simulation control for hardware testing */
-extern volatile uint32_t g_gasLeakSimulation; /* 0=Normal, 1=Warning (>300 PPM), 2=Emergency (>600 PPM) */
-
 /*******************************************************************************
  * API Declarations
  ******************************************************************************/
@@ -33,7 +30,6 @@ extern "C" {
 void SENSOR_Gas_Init(void);
 bool SENSOR_Gas_Read(GasSensorData_t *out_data);
 float SENSOR_Gas_RawToPpm(uint32_t raw_adc);
-void SENSOR_Gas_SetSimulationMode(uint32_t mode);
 bool SENSOR_Gas_IsFaulted(void);
 uint32_t SENSOR_Gas_GetErrorCount(void);
 
@@ -42,4 +38,3 @@ uint32_t SENSOR_Gas_GetErrorCount(void);
 #endif
 
 #endif /* _SENSOR_GAS_H_ */
-

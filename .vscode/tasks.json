@@ -2,59 +2,38 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "type": "cmake",
-      "label": "CMake: build",
-      "command": "build",
-      "preset": "debug",
-      "targets": [
-        "all"
-      ],
-      "dependsOn": [
-        "CMake: configure"
-      ],
+      "label": "Flash FRDM-RW612 Firmware (Direct Flash)",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\flash_firmware.ps1",
+      "problemMatcher": [],
       "group": {
         "kind": "build",
         "isDefault": true
       },
-      "problemMatcher": [
-        "$gcc"
-      ],
-      "detail": "CMake template build task"
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
     },
     {
-      "type": "cmake",
-      "label": "CMake: configure",
-      "command": "configure",
-      "preset": "debug",
-      "problemMatcher": [
-        "$gcc"
-      ],
-      "detail": "CMake template configure task"
-    },
-    {
-      "label": "CMake: Build Project (Shell)",
+      "label": "Start Serial Bridge (MCU-Link -> Local/Cloud)",
       "type": "shell",
-      "command": "cmake --build ${workspaceFolder}/build/debug --config Debug",
-      "group": {
-        "kind": "build"
-      },
-      "problemMatcher": "$gcc"
-    },
-    {
-      "label": "CMake: Configure (Shell)",
-      "type": "shell",
-      "command": "cmake --preset debug",
-      "problemMatcher": []
-    },
-    {
-      "label": "Run Laptop Dashboard",
-      "type": "shell",
-      "command": "python ${workspaceFolder}/dashboard/dashboard_app.py",
+      "command": "python serial_bridge.py --baud 115200 --raw",
+      "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "new"
-      },
-      "problemMatcher": []
+      }
+    },
+    {
+      "label": "Start Local Dashboard Server",
+      "type": "shell",
+      "command": "python dashboard/dashboard_app.py",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
     }
   ]
 }

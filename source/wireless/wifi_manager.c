@@ -11,8 +11,8 @@
 /*******************************************************************************
  * Global Wireless Live State
  ******************************************************************************/
-volatile bool     g_wifiConnected          = true;  /* Connected to Laptop AP */
-volatile uint32_t g_wifiStatus             = WIRELESS_STATUS_CONNECTED;
+volatile bool     g_wifiConnected          = (WIFI_STACK_AVAILABLE != 0); /* false until a real stack exists */
+volatile uint32_t g_wifiStatus             = (WIFI_STACK_AVAILABLE ? WIRELESS_STATUS_CONNECTED : WIRELESS_STATUS_DISCONNECTED);
 volatile uint32_t g_wifiPacketsSent        = 0U;
 volatile uint32_t g_wifiReconnectAttempts  = 0U;
 char              g_activeSsid[33]         = WIFI_SSID_DEFAULT;
@@ -24,8 +24,8 @@ static char       s_activePassword[65]     = WIFI_PASSWORD_DEFAULT;
 
 void WIFI_Manager_Init(void)
 {
-    g_wifiConnected         = true;
-    g_wifiStatus            = WIRELESS_STATUS_CONNECTED;
+    g_wifiConnected         = (WIFI_STACK_AVAILABLE != 0);
+    g_wifiStatus            = WIFI_STACK_AVAILABLE ? WIRELESS_STATUS_CONNECTED : WIRELESS_STATUS_DISCONNECTED;
     g_wifiPacketsSent       = 0U;
     g_wifiReconnectAttempts = 0U;
     strncpy(g_activeSsid, WIFI_SSID_DEFAULT, sizeof(g_activeSsid) - 1);
@@ -45,9 +45,9 @@ void WIFI_Manager_SetCredentials(const char *ssid, const char *password)
         s_activePassword[sizeof(s_activePassword) - 1] = '\0';
     }
 
-    /* Initiate reconnect sequence to the new Wi-Fi network */
+    /* Initiate reconnect sequence to the new Wi-Fi network (no-op until a real stack exists) */
     g_wifiConnected         = false;
-    g_wifiStatus            = WIRELESS_STATUS_CONNECTING;
+    g_wifiStatus            = WIFI_STACK_AVAILABLE ? WIRELESS_STATUS_CONNECTING : WIRELESS_STATUS_DISCONNECTED;
     g_wifiReconnectAttempts = 0U;
 }
 

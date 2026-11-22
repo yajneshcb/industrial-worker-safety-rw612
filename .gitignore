@@ -30,4 +30,7 @@ Thumbs.db
 .env*
 .codex/
 scratch/
+source/app_secrets.h
+mcux_include.local.json
+CMakeUserPresets.json
 

@@ -10,6 +10,7 @@
 
 #include "fsl_clock.h"
 #include "fsl_i2c.h"
+#include "fsl_debug_console.h"
 #include <math.h>
 
 /*******************************************************************************
@@ -31,6 +32,7 @@
 
 #define MPU6050_MAX_RETRIES          3U
 #define MPU6050_FAULT_THRESHOLD      5U
+#define MPU6050_REINIT_PERIOD        20U   /* retry configuration every N failed reads (~2 s) */
 
 /*******************************************************************************
  * Module State
@@ -38,6 +40,7 @@
 static bool     s_mpuInitialized    = false;
 static uint32_t s_mpuConsecutiveErr = 0U;
 static uint32_t s_mpuTotalErr       = 0U;
+static uint32_t s_mpuReinitCounter  = 0U;
 
 /*******************************************************************************
  * Internal Helpers
@@ -95,10 +98,44 @@ static void RecordFailure(Mpu6050Data_t *out_data)
  * Public API
  ******************************************************************************/
 
+void SENSOR_MPU6050_Init(void);
+
+/* Probe + configure the MPU-6050 (I2C master must already be initialised). */
+static bool MPU6050_TryConfigure(void)
+{
+    uint8_t whoami = 0U;
+
+    if (MPU6050_ReadBytes(MPU6050_REG_WHO_AM_I, &whoami, 1U) != kStatus_Success)
+    {
+        PRINTF(">> MPU: no I2C response at 0x%02X (check SDA/SCL/VCC/GND, AD0 level)\r\n",
+               (unsigned int)BOARD_MPU6050_I2C_ADDR);
+        return false;
+    }
+
+    /* 0x68 = genuine MPU-6050; many GY-521 clones report 0x70/0x71/0x72 but share the same
+     * accelerometer register map, so accept them instead of dead-locking in a permanent fault. */
+    if ((whoami != MPU6050_EXPECTED_WHO_AM_I) && (whoami != 0x70U) &&
+        (whoami != 0x71U) && (whoami != 0x72U))
+    {
+        PRINTF(">> MPU: unexpected WHO_AM_I=0x%02X (expected 0x68)\r\n", (unsigned int)whoami);
+        return false;
+    }
+
+    (void)MPU6050_WriteByte(MPU6050_REG_PWR_MGMT_1, 0x00U);   /* wake up */
+    (void)MPU6050_WriteByte(MPU6050_REG_SMPLRT_DIV, 0x07U);   /* 1 kHz / 8 = 125 Hz */
+    /* DLPF_CFG=3 (44 Hz). The old value 0x06 (5 Hz) smoothed a short impact spike far below the
+     * 2.5 g threshold, so falls were effectively undetectable. */
+    (void)MPU6050_WriteByte(MPU6050_REG_CONFIG, 0x03U);
+    (void)MPU6050_WriteByte(MPU6050_REG_GYRO_CONFIG, 0x00U);  /* +/-250 dps */
+    (void)MPU6050_WriteByte(MPU6050_REG_ACCEL_CONFIG, 0x10U); /* +/-8 g */
+
+    PRINTF(">> MPU: configured, WHO_AM_I=0x%02X\r\n", (unsigned int)whoami);
+    return true;
+}
+
 void SENSOR_MPU6050_Init(void)
 {
     i2c_master_config_t masterConfig;
-    uint8_t whoami = 0U;
 
     /* Attach clock to Flexcomm 2 and initialize I2C master */
     CLOCK_AttachClk(BOARD_MPU6050_I2C_CLK_ATTACH);
@@ -108,34 +145,13 @@ void SENSOR_MPU6050_Init(void)
 
     s_mpuConsecutiveErr = 0U;
     s_mpuTotalErr       = 0U;
+    s_mpuReinitCounter  = 0U;
 
-    /* Check device ID */
-    if (MPU6050_ReadBytes(MPU6050_REG_WHO_AM_I, &whoami, 1U) == kStatus_Success)
+    s_mpuInitialized = MPU6050_TryConfigure();
+    if (!s_mpuInitialized)
     {
-        if (whoami == MPU6050_EXPECTED_WHO_AM_I)
-        {
-            /* Wake up MPU-6050 (clear sleep bit in PWR_MGMT_1) */
-            (void)MPU6050_WriteByte(MPU6050_REG_PWR_MGMT_1, 0x00U);
-
-            /* Set sample rate divider (1 kHz / (1 + 7) = 125 Hz) */
-            (void)MPU6050_WriteByte(MPU6050_REG_SMPLRT_DIV, 0x07U);
-
-            /* Low-pass filter configuration (DLPF = 5 Hz for smooth noise filter) */
-            (void)MPU6050_WriteByte(MPU6050_REG_CONFIG, 0x06U);
-
-            /* Gyro full-scale range: ±250 deg/s */
-            (void)MPU6050_WriteByte(MPU6050_REG_GYRO_CONFIG, 0x00U);
-
-            /* Accelerometer full-scale range: ±8g (0x10) to reliably capture impact spikes > 2.5g */
-            (void)MPU6050_WriteByte(MPU6050_REG_ACCEL_CONFIG, 0x10U);
-
-            s_mpuInitialized = true;
-            return;
-        }
+        s_mpuTotalErr++;
     }
-
-    s_mpuInitialized = false;
-    s_mpuTotalErr++;
 }
 
 bool SENSOR_MPU6050_Read(Mpu6050Data_t *out_data)
@@ -149,8 +165,19 @@ bool SENSOR_MPU6050_Read(Mpu6050Data_t *out_data)
 
     if (!s_mpuInitialized)
     {
-        RecordFailure(out_data);
-        return false;
+        /* Previously a failed init was permanent until reset. Retry periodically so a late-powered
+         * or re-plugged sensor recovers on its own. */
+        if ((++s_mpuReinitCounter >= MPU6050_REINIT_PERIOD) && MPU6050_TryConfigure())
+        {
+            s_mpuInitialized    = true;
+            s_mpuConsecutiveErr = 0U;
+        }
+        if (!s_mpuInitialized)
+        {
+            s_mpuReinitCounter = (s_mpuReinitCounter >= MPU6050_REINIT_PERIOD) ? 0U : s_mpuReinitCounter;
+            RecordFailure(out_data);
+            return false;
+        }
     }
 
     for (uint32_t attempt = 0U; attempt < MPU6050_MAX_RETRIES; attempt++)

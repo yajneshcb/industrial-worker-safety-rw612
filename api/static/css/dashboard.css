@@ -2677,6 +2677,138 @@ select {
   .footer { font-size: 9.5px; }
 }
 
+/* Web Serial Direct Button */
+.web-serial-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--btn-color);
+  font: 8px var(--mono);
+  letter-spacing: .1em;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+  transition: all 0.15s ease;
+}
+
+.web-serial-btn:hover {
+  border-color: var(--cyan);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.web-serial-btn.connected {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.web-serial-btn.connected .serial-icon {
+  animation: beacon 1.4s infinite;
+}
+
+.serial-icon {
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.serial-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Section 04: Bench Simulation */
+.simulation-section {
+  margin-top: 24px;
+}
+
+.simulation-panel {
+  padding: 24px;
+}
+
+.sim-badge {
+  display: inline-flex;
+  align-items: center;
+  font: 9px var(--mono);
+  letter-spacing: 0.08em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: rgba(14, 165, 233, 0.12);
+  color: var(--cyan);
+  border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+.sim-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.sim-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.sim-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sim-btn-icon {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.sim-btn-title {
+  font: 11px var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.sim-btn small {
+  font-size: 9.5px;
+  color: var(--text-muted);
+  font-family: var(--sans);
+}
+
+.sim-btn.sim-normal:hover { border-color: var(--green); }
+.sim-btn.sim-normal .sim-btn-title { color: var(--green); }
+
+.sim-btn.sim-sos:hover { border-color: var(--red); }
+.sim-btn.sim-sos .sim-btn-title { color: var(--red); }
+
+.sim-btn.sim-fall:hover { border-color: var(--red); }
+.sim-btn.sim-fall .sim-btn-title { color: #f87171; }
+
+.sim-btn.sim-temp:hover { border-color: var(--amber); }
+.sim-btn.sim-temp .sim-btn-title { color: var(--amber); }
+
+.sim-btn.sim-gas:hover { border-color: #fb923c; }
+.sim-btn.sim-gas .sim-btn-title { color: #fb923c; }
+
+.sim-btn.sim-fault:hover { border-color: #eab308; }
+.sim-btn.sim-fault .sim-btn-title { color: #eab308; }
+
 @media(prefers-reduced-motion:reduce) {
   *, *:before, *:after {
     animation-duration: .01ms !important;

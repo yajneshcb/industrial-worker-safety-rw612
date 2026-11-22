@@ -52,6 +52,16 @@
           <span class="clock-date" id="liveDate">---</span>
         </div>
 
+        <button class="web-serial-btn" id="serialConnectBtn" type="button" aria-label="Direct USB Serial connection to FRDM-RW612" title="Direct Web Serial connection to MCU-Link (115200 baud)">
+          <span class="serial-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </span>
+          <span id="serialBtnText">USB DIRECT</span>
+        </button>
+
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light and dark mode" title="Toggle color theme">
           <span class="theme-icon sun-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -443,6 +453,54 @@
           </div>
           <div class="queue-track"><span id="queueBar"></span></div>
           <div class="node-footnote" id="nodeFootnote">Node disconnected. Awaiting telemetry stream from NXP FRDM-RW612.</div>
+        </article>
+      </section>
+
+      <!-- Section 04: Hardware Bench Simulation -->
+      <section class="simulation-section" aria-label="Hardware bench simulation">
+        <article class="panel simulation-panel">
+          <div class="panel-heading">
+            <div>
+              <div class="panel-titleline">
+                <span class="section-index">04</span>
+                <h2>Hardware bench simulation</h2>
+              </div>
+              <p>Simulate edge telemetry triggers &amp; safety transitions (REST POST to /api/simulate)</p>
+            </div>
+            <span class="sim-badge">BENCH TEST HARNESS</span>
+          </div>
+          <div class="sim-actions-grid">
+            <button class="sim-btn sim-normal" data-action="normal" type="button" title="Baseline safe telemetry">
+              <span class="sim-btn-icon">✓</span>
+              <span class="sim-btn-title">NORMAL SAFE</span>
+              <small>26.5°C · 45 PPM · 1.0g</small>
+            </button>
+            <button class="sim-btn sim-sos" data-action="sos" type="button" title="Manual SOS button press">
+              <span class="sim-btn-icon">⚠</span>
+              <span class="sim-btn-title">MANUAL SOS</span>
+              <small>Emergency override (SW2)</small>
+            </button>
+            <button class="sim-btn sim-fall" data-action="fall" type="button" title="Free-fall and impact spike">
+              <span class="sim-btn-icon">⤓</span>
+              <span class="sim-btn-title">FALL IMPACT</span>
+              <small>&lt;0.4g freefall → 3.45g shock</small>
+            </button>
+            <button class="sim-btn sim-temp" data-action="high_temp" type="button" title="Thermal emergency threshold">
+              <span class="sim-btn-icon">🌡</span>
+              <span class="sim-btn-title">HIGH TEMP</span>
+              <small>52.8°C thermal hazard</small>
+            </button>
+            <button class="sim-btn sim-gas" data-action="gas_leak" type="button" title="Toxic/flammable gas threshold">
+              <span class="sim-btn-icon">☁</span>
+              <span class="sim-btn-title">GAS LEAK</span>
+              <small>720 PPM critical hazard</small>
+            </button>
+            <button class="sim-btn sim-fault" data-action="sensor_fault" type="button" title="Simulate sensor fault">
+              <span class="sim-btn-icon">⚡</span>
+              <span class="sim-btn-title">SENSOR FAULT</span>
+              <small>ADC / I2C bus error</small>
+            </button>
+          </div>
         </article>
       </section>
     </main>

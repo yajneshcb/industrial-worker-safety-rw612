@@ -31,6 +31,7 @@ void SENSOR_Gas_Init(void);
 bool SENSOR_Gas_Read(GasSensorData_t *out_data);
 float SENSOR_Gas_RawToPpm(uint32_t raw_adc);
 bool SENSOR_Gas_IsFaulted(void);
+bool SENSOR_Gas_IsWarmingUp(void);
 uint32_t SENSOR_Gas_GetErrorCount(void);
 
 #if defined(__cplusplus)

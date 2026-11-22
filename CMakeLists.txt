@@ -1,79 +1,46 @@
 #
 # Copyright 2026
 # Project: Industrial Worker Safety Monitoring and Emergency Alert System
-# Target Board: NXP FRDM-RW612 (Processor: RW612ETA2I, Cortex-M33)
+# Target Board: NXP FRDM-RW612 (RW612ETA2I, Cortex-M33)
 #
+# Built as an MCUXpresso SDK "freestanding" project: the SDK supplies the startup file, linker
+# script, clocks, device headers and drivers. Configure with one of the presets in
+# CMakePresets.json (they pass SdkRootDirPath, board and CONFIG_TOOLCHAIN). See docs/BUILD.md.
+#
+cmake_minimum_required(VERSION 3.22.0)
 
-cmake_minimum_required(VERSION 3.15)
+include(${SdkRootDirPath}/cmake/extension/mcux.cmake)
 
-# Target bare-metal ARM Cortex-M33
-set(CMAKE_SYSTEM_NAME Generic)
-set(CMAKE_SYSTEM_PROCESSOR cortex-m33)
-set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+# Freestanding project: no PROJECT_BOARD_PORT_PATH (pin_mux.c / hardware_init.c live in source/board_port)
+project(FRDM_RW612_WorkerSafety LANGUAGES C CXX ASM)
 
-project(FRDM_RW612_WorkerSafety C CXX ASM)
+include(${SdkRootDirPath}/CMakeLists.txt)
 
-set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 11)
-
-# Target processor definition
-add_definitions(
-    -DCPU_RW612ETA2I
-    -DFRDM_RW612
-    -DMCUXPRESSO_SDK
+mcux_add_source(
+    SOURCES source/main.c
+            source/timebase.c
+            source/fault_handler.c
+            source/board_port/hardware_init.c
+            source/board_port/pin_mux.c
+            source/alerts/alert_manager.c
+            source/alerts/button_sos.c
+            source/alerts/buzzer.c
+            source/alerts/leds.c
+            source/edge_logic/safety_decision.c
+            source/sensors/sensor_gas.c
+            source/sensors/sensor_mpu6050.c
+            source/sensors/sensor_temp.c
+            source/wireless/alert_reporter.c
+            source/wireless/wifi_manager.c
 )
 
-# Project include directories
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/board
-    ${CMAKE_CURRENT_SOURCE_DIR}/source
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/sensors
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/alerts
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/edge_logic
-    ${CMAKE_CURRENT_SOURCE_DIR}/source/wireless
-    ${CMAKE_CURRENT_SOURCE_DIR}/device
-    ${CMAKE_CURRENT_SOURCE_DIR}/drivers
+mcux_add_include(
+    INCLUDES source
+             source/board_port
+             source/alerts
+             source/edge_logic
+             source/sensors
+             source/wireless
 )
 
-# Source files
-file(GLOB_RECURSE BOARD_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/board/*.c")
-file(GLOB_RECURSE SOURCE_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/source/*.c")
-file(GLOB_RECURSE DEVICE_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/device/*.c")
-file(GLOB_RECURSE DRIVER_SRCS "${CMAKE_CURRENT_SOURCE_DIR}/drivers/*.c")
-
-set(ALL_SRCS
-    ${BOARD_SRCS}
-    ${SOURCE_SRCS}
-    ${DEVICE_SRCS}
-    ${DRIVER_SRCS}
-)
-
-# Target executable definition
-add_executable(FRDM_RW612_WorkerSafety.elf ${ALL_SRCS})
-
-# Target compiler flags for Cortex-M33
-target_compile_options(FRDM_RW612_WorkerSafety.elf PRIVATE
-    -mcpu=cortex-m33
-    -mthumb
-    -mfpu=fpv5-sp-d16
-    -mfloat-abi=hard
-    -Wall
-    -fno-common
-    -ffunction-sections
-    -fdata-sections
-)
-
-# Target linker flags for bare-metal Cortex-M33
-target_link_options(FRDM_RW612_WorkerSafety.elf PRIVATE
-    -mcpu=cortex-m33
-    -mthumb
-    -mfpu=fpv5-sp-d16
-    -mfloat-abi=hard
-    --specs=nano.specs
-    --specs=nosys.specs
-    -Wl,--gc-sections
-)
-
-# Link standard math library for sqrtf / motion algorithms
-target_link_libraries(FRDM_RW612_WorkerSafety.elf PRIVATE m)
-
+mcux_convert_binary(BINARY ${APPLICATION_BINARY_DIR}/${MCUX_SDK_PROJECT_NAME}.bin)

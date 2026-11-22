@@ -29,7 +29,11 @@ typedef struct {
     float temperature_c;
     float gas_ppm;
     float accel_magnitude_g;
+    float accel_x_g;
+    float accel_y_g;
+    float accel_z_g;
     bool sos_active;
+    bool sensors_ok;      /* false if any sensor is currently faulted / invalid */
 } TelemetryPacket_t;
 
 #if defined(__cplusplus)

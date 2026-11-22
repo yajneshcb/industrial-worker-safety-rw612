@@ -2,10 +2,16 @@
  * Copyright 2026
  * Module: Active Buzzer Driver
  * Platform: NXP FRDM-RW612
+ *
+ * Uses NXP MCUXpresso SDK lpc_gpio driver.
+ * Controls active buzzer connected to GPIO_4 on Port 0 (Header J1 Pin 1).
+ * Supports both Active-HIGH and Active-LOW buzzer modules via BUZZER_ACTIVE_LOW define.
  */
 
 #include "buzzer.h"
-#include "board.h"
+#include "app_config.h"
+#include "fsl_common.h"
+#include "fsl_gpio.h"
 
 /*******************************************************************************
  * Global Actuator Live State
@@ -15,31 +21,16 @@ volatile uint32_t g_buzzerMode   = BUZZER_MODE_OFF;
 
 static uint32_t   s_buzzerTicks  = 0U;
 
-/*******************************************************************************
- * Hardware GPIO Register Access for NXP RW612 (Port 0)
- * Pin D4 = GPIO_4 (Active Buzzer Trigger)
- ******************************************************************************/
-#define HW_GPIO_PORT0_DIR    (*(volatile uint32_t *)(0x40102000U))
-#define HW_GPIO_PORT0_SET    (*(volatile uint32_t *)(0x40102200U))
-#define HW_GPIO_PORT0_CLR    (*(volatile uint32_t *)(0x40102300U))
-
-static inline void HW_BUZZER_WritePin(bool level)
+static inline void HW_BUZZER_Drive(bool active)
 {
-    if (level)
-    {
-        HW_GPIO_PORT0_SET = (1U << BOARD_BUZZER_GPIO_PIN);
-        *((volatile uint8_t *)(0x40100000U + BOARD_BUZZER_GPIO_PIN)) = 1U;
-    }
-    else
-    {
-        HW_GPIO_PORT0_CLR = (1U << BOARD_BUZZER_GPIO_PIN);
-        *((volatile uint8_t *)(0x40100000U + BOARD_BUZZER_GPIO_PIN)) = 0U;
-    }
+#if (BUZZER_ACTIVE_LOW != 0)
+    /* Active-LOW module: LOW (0) produces sound, HIGH (1) is silent */
+    GPIO_PinWrite(GPIO, APP_ACTUATOR_GPIO_PORT, BOARD_BUZZER_GPIO_PIN, active ? 0U : 1U);
+#else
+    /* Active-HIGH module: HIGH (1) produces sound, LOW (0) is silent */
+    GPIO_PinWrite(GPIO, APP_ACTUATOR_GPIO_PORT, BOARD_BUZZER_GPIO_PIN, active ? 1U : 0U);
+#endif
 }
-
-/*******************************************************************************
- * Buzzer Implementations
- ******************************************************************************/
 
 void BUZZER_Init(void)
 {
@@ -47,9 +38,15 @@ void BUZZER_Init(void)
     g_buzzerMode   = BUZZER_MODE_OFF;
     s_buzzerTicks  = 0U;
 
-    /* Configure GPIO_4 as digital output and drive LOW (Silent) */
-    HW_GPIO_PORT0_DIR |= (1U << BOARD_BUZZER_GPIO_PIN);
-    HW_BUZZER_WritePin(false);
+    gpio_pin_config_t buzzerConfig = {
+        .pinDirection = kGPIO_DigitalOutput,
+        .outputLogic  = (BUZZER_ACTIVE_LOW != 0) ? 1U : 0U
+    };
+
+    /* Ensure Port 0 is initialized and configure Buzzer pin */
+    GPIO_PortInit(GPIO, APP_ACTUATOR_GPIO_PORT);
+    GPIO_PinInit(GPIO, APP_ACTUATOR_GPIO_PORT, BOARD_BUZZER_GPIO_PIN, &buzzerConfig);
+    HW_BUZZER_Drive(false);
 }
 
 void BUZZER_SetMode(BuzzerMode_t mode)
@@ -71,7 +68,7 @@ void BUZZER_Process(void)
             break;
 
         case BUZZER_MODE_WARNING_BEEP:
-            /* Periodic chirp: 200ms ON every 1000ms */
+            /* Periodic chirp: 200ms ON every 1000ms (2 ticks ON out of 10 @ 100ms) */
             s_buzzerTicks = (s_buzzerTicks + 1U) % 10U;
             g_buzzerActive = (s_buzzerTicks < 2U);
             break;
@@ -87,8 +84,6 @@ void BUZZER_Process(void)
             break;
     }
 
-    /* Drive physical buzzer pin */
-    HW_BUZZER_WritePin(g_buzzerActive);
+    /* Drive physical buzzer pin according to polarity configuration */
+    HW_BUZZER_Drive(g_buzzerActive);
 }
-
-

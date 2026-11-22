@@ -15,7 +15,10 @@
     emergencyOsc: null,
     emergencyGain: null,
     toastTimer: null,
-    pollTimer: null
+    pollTimer: null,
+    serialPort: null,
+    serialReader: null,
+    serialConnected: false
   };
 
   const themeColors = {
@@ -500,11 +503,133 @@
     } catch (error) { showToast(error.message); }
   }
 
+  async function triggerSimulation(action) {
+    try {
+      const resp = await fetch('/api/simulate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      const res = await resp.json();
+      if (!resp.ok) throw new Error(res.error || `HTTP ${resp.status}`);
+      if (res.data) renderStatus(res.data);
+      showToast(`Simulation triggered: ${action.replace('_', ' ').toUpperCase()}`);
+    } catch (err) {
+      showToast(`Simulation error: ${err.message}`);
+    }
+  }
+
+  async function disconnectWebSerial() {
+    if (state.serialReader) {
+      try {
+        await state.serialReader.cancel();
+      } catch (_) {}
+      state.serialReader = null;
+    }
+    if (state.serialPort) {
+      try {
+        await state.serialPort.close();
+      } catch (_) {}
+      state.serialPort = null;
+    }
+    state.serialConnected = false;
+    const btn = $('#serialConnectBtn');
+    if (btn) {
+      btn.classList.remove('connected');
+      $('#serialBtnText').textContent = 'USB DIRECT';
+    }
+    showToast('USB Serial disconnected.');
+  }
+
+  async function toggleWebSerial() {
+    if (state.serialConnected) {
+      await disconnectWebSerial();
+      return;
+    }
+    if (!('serial' in navigator)) {
+      showToast('Web Serial API requires Chrome, Edge, or Opera over HTTPS / localhost.');
+      return;
+    }
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      state.serialPort = port;
+      state.serialConnected = true;
+
+      const btn = $('#serialConnectBtn');
+      if (btn) {
+        btn.classList.add('connected');
+        $('#serialBtnText').textContent = 'CONNECTED';
+      }
+      showToast('USB Serial connected @ 115200 baud.');
+
+      const textDecoder = new TextDecoderStream();
+      port.readable.pipeTo(textDecoder.writable).catch(() => {});
+      const reader = textDecoder.readable.getReader();
+      state.serialReader = reader;
+
+      let lineBuf = '';
+      while (state.serialConnected) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        lineBuf += value;
+        const lines = lineBuf.split('\n');
+        lineBuf = lines.pop();
+        for (const raw of lines) {
+          const line = raw.trim();
+          if (!line.includes('[TELEMETRY]')) continue;
+          const jsonText = line.split('[TELEMETRY]')[1].trim();
+          try {
+            const payload = JSON.parse(jsonText);
+            fetch('/api/telemetry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            }).then(r => r.json()).then(res => {
+              if (res.data) renderStatus(res.data);
+            }).catch(() => {});
+
+            payload.link_state = 'Connected';
+            payload.link_source = 'USB Serial (Web Serial)';
+            payload.has_telemetry = true;
+            payload.received_at_ms = Date.now();
+            payload.safety_state = payload.state || payload.safety_state || 'NORMAL';
+            payload.hazard_type = payload.hazard || payload.hazard_type || 'NONE';
+            payload.temperature_c = payload.temp ?? payload.temperature_c;
+            payload.gas_ppm = payload.gas ?? payload.gas_ppm;
+            payload.accel_magnitude_g = payload.accel ?? payload.accel_magnitude_g;
+            payload.sos_active = payload.sos ?? payload.sos_active ?? false;
+            renderStatus(payload);
+          } catch (pe) {
+            console.debug('JSON parse error from serial line:', pe);
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'NotFoundError') {
+        showToast(`Serial error: ${err.message}`);
+      }
+      await disconnectWebSerial();
+    }
+  }
+
   function bindEvents() {
     $('#hazardFilter').addEventListener('change', () => renderIncidents(state.incidents));
     $('#exportCsv').addEventListener('click', exportCSV);
     $('#exportJson').addEventListener('click', exportJSON);
     $('#audioButton').addEventListener('click', toggleAudio);
+
+    const serialBtn = $('#serialConnectBtn');
+    if (serialBtn) {
+      serialBtn.addEventListener('click', toggleWebSerial);
+    }
+
+    document.querySelectorAll('.sim-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        if (action) triggerSimulation(action);
+      });
+    });
 
     const themeBtn = $('#themeToggle');
     if (themeBtn) {

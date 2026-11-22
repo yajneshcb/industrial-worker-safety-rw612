@@ -51,24 +51,77 @@ static const char *GetHazardString(HazardType_t hazard)
     }
 }
 
+/* Split a float into sign / integer / 2-decimal fraction so negatives print as valid JSON
+ * (the old (x100 / 100, x100 % 100) form produced e.g. "-5.-25" for negative values). */
+typedef struct { const char *sign; int whole; int frac; } Fixed2_t;
+
+static Fixed2_t ToFixed2(float val)
+{
+    Fixed2_t out;
+    int32_t centi = (int32_t)(val * 100.0f);
+    out.sign = "";
+    if (centi < 0)
+    {
+        out.sign = "-";
+        centi    = -centi;
+    }
+    out.whole = (int)(centi / 100);
+    out.frac  = (int)(centi % 100);
+    return out;
+}
+
 static void DispatchPacketToTransport(const TelemetryPacket_t *pkt)
 {
-    /* 
-     * Formats structured JSON telemetry packet for serial bridge / laptop dashboard ingestion:
-     * Prefix [TELEMETRY] allows the Python dashboard to parse live packets from the MCU-Link VCOM port.
+    /*
+     * Single-line JSON, prefixed with [TELEMETRY] so serial_bridge.py can find it among other logs.
+     * 'uptime_ms' is deliberately NOT called 'timestamp_ms': the dashboard treats timestamp_ms as
+     * epoch time and would show 1970 dates for a device uptime counter.
      */
-    int32_t temp_x100  = (int32_t)(pkt->temperature_c * 100.0f);
-    int32_t accel_x100 = (int32_t)(pkt->accel_magnitude_g * 100.0f);
-    int32_t gas_x100   = (int32_t)(pkt->gas_ppm * 100.0f);
+    Fixed2_t t  = ToFixed2(pkt->temperature_c);
+    Fixed2_t a  = ToFixed2(pkt->accel_magnitude_g);
+    Fixed2_t ax = ToFixed2(pkt->accel_x_g);
+    Fixed2_t ay = ToFixed2(pkt->accel_y_g);
+    Fixed2_t az = ToFixed2(pkt->accel_z_g);
+    Fixed2_t g  = ToFixed2(pkt->gas_ppm);
 
-    PRINTF("[TELEMETRY] {\"id\":%u,\"temp\":%d.%02d,\"accel\":%d.%02d,\"gas\":%d.%02d,\"state\":\"%s\",\"hazard\":\"%s\",\"sos\":%s}\r\n",
+    PRINTF("[TELEMETRY] {\"id\":%u,\"uptime_ms\":%u,"
+           "\"temp\":%s%d.%02d,\"accel\":%s%d.%02d,"
+           "\"accel_x\":%s%d.%02d,\"accel_y\":%s%d.%02d,\"accel_z\":%s%d.%02d,"
+           "\"gas\":%s%d.%02d,\"state\":\"%s\",\"hazard\":\"%s\","
+           "\"sos\":%s,\"sensors_ok\":%s,\"offline_queue_count\":%u}\r\n",
            (unsigned int)pkt->message_id,
-           (int)(temp_x100 / 100), (int)(temp_x100 % 100),
-           (int)(accel_x100 / 100), (int)(accel_x100 % 100),
-           (int)(gas_x100 / 100), (int)(gas_x100 % 100),
+           (unsigned int)pkt->timestamp_ms,
+           t.sign,  t.whole,  t.frac,
+           a.sign,  a.whole,  a.frac,
+           ax.sign, ax.whole, ax.frac,
+           ay.sign, ay.whole, ay.frac,
+           az.sign, az.whole, az.frac,
+           g.sign,  g.whole,  g.frac,
            GetStateString(pkt->state),
            GetHazardString(pkt->hazard),
-           pkt->sos_active ? "true" : "false");
+           pkt->sos_active ? "true" : "false",
+           pkt->sensors_ok ? "true" : "false",
+           (unsigned int)g_offlineQueueCount);
+}
+
+static void EnqueueOffline(const TelemetryPacket_t *packet)
+{
+#if !WIFI_STACK_AVAILABLE
+    /* No Wi-Fi stack: the console line already printed is the real delivery path, so buffering would
+     * only fill a queue that can never be flushed and report a misleading offline_queue_count. */
+    (void)packet;
+    return;
+#else
+    /* When full, drop the OLDEST entry so the newest (most relevant / emergency) data is kept. */
+    if (g_offlineQueueCount >= OFFLINE_QUEUE_CAPACITY)
+    {
+        s_queueTail = (s_queueTail + 1U) % OFFLINE_QUEUE_CAPACITY;
+        g_offlineQueueCount--;
+    }
+    s_offlineQueue[s_queueHead] = *packet;
+    s_queueHead = (s_queueHead + 1U) % OFFLINE_QUEUE_CAPACITY;
+    g_offlineQueueCount++;
+#endif
 }
 
 /*******************************************************************************
@@ -107,12 +160,7 @@ bool ALERT_Reporter_SendTelemetry(const TelemetryPacket_t *packet)
     }
 
     /* 2. Wi-Fi link dropped: Store in offline fault-tolerant queue */
-    if (g_offlineQueueCount < OFFLINE_QUEUE_CAPACITY)
-    {
-        s_offlineQueue[s_queueHead] = *packet;
-        s_queueHead = (s_queueHead + 1U) % OFFLINE_QUEUE_CAPACITY;
-        g_offlineQueueCount++;
-    }
+    EnqueueOffline(packet);
 
     return false;
 }
@@ -138,12 +186,7 @@ bool ALERT_Reporter_SendEmergencyAlert(const TelemetryPacket_t *packet)
     }
 
     /* Emergency packets take priority into the offline buffer */
-    if (g_offlineQueueCount < OFFLINE_QUEUE_CAPACITY)
-    {
-        s_offlineQueue[s_queueHead] = *packet;
-        s_queueHead = (s_queueHead + 1U) % OFFLINE_QUEUE_CAPACITY;
-        g_offlineQueueCount++;
-    }
+    EnqueueOffline(packet);
 
     return false;
 }

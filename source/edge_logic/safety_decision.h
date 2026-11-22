@@ -46,6 +46,20 @@ extern "C" {
 #endif
 
 void SAFETY_Decision_Init(void);
+
+/*!
+ * @brief Fast 50 Hz fall detection processing function called on every IMU sampling tick (20 ms).
+ */
+void SAFETY_Decision_ProcessFall(const Mpu6050Data_t *mpu);
+
+/*!
+ * @brief Returns whether a fall event is currently active or latched.
+ */
+bool SAFETY_Decision_IsFallLatched(void);
+
+/*!
+ * @brief Evaluates overall worker safety across all sensor modalities.
+ */
 SafetyEvaluation_t SAFETY_Decision_Evaluate(const TempSensorData_t *temp,
                                             const Mpu6050Data_t *mpu,
                                             const GasSensorData_t *gas,
@@ -56,4 +70,3 @@ SafetyEvaluation_t SAFETY_Decision_Evaluate(const TempSensorData_t *temp,
 #endif
 
 #endif /* _SAFETY_DECISION_H_ */
-

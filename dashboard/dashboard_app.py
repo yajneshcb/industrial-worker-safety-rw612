@@ -14,6 +14,8 @@ import math
 import os
 import threading
 import time
+import urllib.error
+import urllib.request
 from collections import deque
 from datetime import datetime, timezone
 from typing import Any
@@ -64,6 +66,66 @@ def parse_number(value: Any, field: str, minimum: float, maximum: float) -> floa
     if not math.isfinite(number) or not minimum <= number <= maximum:
         raise ValueError(f"'{field}' must be between {minimum:g} and {maximum:g}")
     return number
+
+
+KV_REST_API_URL = os.getenv("KV_REST_API_URL") or os.getenv("UPSTASH_REDIS_REST_URL", "")
+KV_REST_API_TOKEN = os.getenv("KV_REST_API_TOKEN") or os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+
+
+def _kv_command(command: list[str]) -> Any:
+    if not KV_REST_API_URL or not KV_REST_API_TOKEN:
+        return None
+    try:
+        url = KV_REST_API_URL.rstrip("/")
+        req = urllib.request.Request(url, method="POST")
+        req.add_header("Authorization", f"Bearer {KV_REST_API_TOKEN}")
+        req.add_header("Content-Type", "application/json")
+        data = json.dumps(command).encode("utf-8")
+        with urllib.request.urlopen(req, data=data, timeout=1.5) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            return body.get("result")
+    except Exception as exc:
+        LOG.debug("KV command failed: %s", exc)
+        return None
+
+
+_last_kv_write = 0.0
+_last_kv_state_sig = ""
+
+
+def _kv_save_snapshot(snapshot_data: dict[str, Any], force: bool = False) -> None:
+    global _last_kv_write, _last_kv_state_sig
+    if not KV_REST_API_URL or not KV_REST_API_TOKEN:
+        return
+
+    now = time.monotonic()
+    state_name = str(snapshot_data.get("safety_state", "OFFLINE"))
+    hazard = str(snapshot_data.get("hazard_type", "NONE"))
+    state_sig = f"{state_name}:{hazard}"
+
+    # Rate-limit to conserve Upstash daily quota: only write on state change, emergency, or every >=5s
+    if not force and state_sig == _last_kv_state_sig and (now - _last_kv_write < 5.0) and state_name != "EMERGENCY":
+        return
+
+    try:
+        payload_str = json.dumps(snapshot_data)
+        _kv_command(["SET", "rw612:snapshot", payload_str, "EX", "120"])
+        _last_kv_write = now
+        _last_kv_state_sig = state_sig
+    except Exception as exc:
+        LOG.debug("KV save failed: %s", exc)
+
+
+def _kv_load_snapshot() -> dict[str, Any] | None:
+    if not KV_REST_API_URL or not KV_REST_API_TOKEN:
+        return None
+    try:
+        res = _kv_command(["GET", "rw612:snapshot"])
+        if isinstance(res, str):
+            return json.loads(res)
+    except Exception as exc:
+        LOG.debug("KV load failed: %s", exc)
+    return None
 
 
 class TelemetryStore:
@@ -356,35 +418,20 @@ class TelemetryStore:
 
             self._refresh_outputs_locked()
             self.history.append(self._history_point_locked())
-            return self.snapshot_locked()
+            snap = self.snapshot_locked()
+            _kv_save_snapshot(snap)
+            return snap
 
     def reset_to_disconnected(self) -> dict[str, Any]:
         with self.lock:
             self.fall_latch_until = 0.0
             self.freefall_time = None
-            self.fall_count = 0
-            self.history.clear()
+            # Preserve self.fall_count and self.history across disconnection events
             self.state.update({
                 "link_state": "Disconnected",
                 "link_source": "none",
                 "buffered": False,
                 "offline_queue_count": 0,
-                "id": None,
-                "timestamp_ms": None,
-                "received_at_ms": None,
-                "timestamp": None,
-                "temperature_c": None,
-                "temp": None,
-                "accel_magnitude_g": None,
-                "accel": None,
-                "accel_x": None,
-                "accel_y": None,
-                "accel_z": None,
-                "gas_ppm": None,
-                "gas": None,
-                "sos_active": False,
-                "sos": False,
-                "sensor_fault": False,
                 "sensor_status": "Awaiting Link",
                 "safety_state": "OFFLINE",
                 "hazard_type": "NONE",
@@ -396,19 +443,18 @@ class TelemetryStore:
                 "led_emergency": False,
                 "buzzer_active": False,
                 "buzzer_mode": "OFF",
-                "fall_event_count": 0,
-                "temperature_min_c": None,
-                "temperature_max_c": None,
                 "source": "none",
                 "has_telemetry": False,
             })
-            self._record_event_locked("INFO", "Telemetry stream reset — awaiting FRDM-RW612 connection.", "NONE")
-            return self.snapshot_locked()
+            self._record_event_locked("INFO", "Telemetry link disconnected — awaiting FRDM-RW612 transmission.", "NONE")
+            snap = self.snapshot_locked()
+            _kv_save_snapshot(snap)
+            return snap
 
     def snapshot_locked(self) -> dict[str, Any]:
-        # 3.0s Heartbeat Watchdog: If no fresh packet has arrived within 3.0s, transition to OFFLINE
+        # 5.0s Heartbeat Watchdog: If no fresh packet has arrived within 5.0s, transition to OFFLINE
         if self.state.get("has_telemetry", False):
-            if self.last_sample_time is not None and (time.monotonic() - self.last_sample_time > 3.0):
+            if self.last_sample_time is not None and (time.monotonic() - self.last_sample_time > 5.0):
                 self.reset_to_disconnected()
 
         self._refresh_outputs_locked()
@@ -434,6 +480,9 @@ if not os.path.isdir(static_dir):
     static_dir = os.path.join(os.path.dirname(BASE_DIR), "static")
 
 store = TelemetryStore()
+# The debug endpoints dump request headers and the WSGI environ, and Flask's debugger allows code
+# execution; both were on by default and the app binds 0.0.0.0. Opt in with DASHBOARD_DEBUG=1.
+DEBUG_ENDPOINTS = os.getenv("DASHBOARD_DEBUG", "0").strip().lower() in {"1", "true", "yes", "on"}
 app = Flask(
     __name__,
     template_folder=templates_dir,
@@ -454,7 +503,7 @@ def handle_vercel_matched_path():
         return post_telemetry()
     if (endpoint == "simulate" or path_param == "api/simulate") and request.method == "POST":
         return simulate()
-    if endpoint == "debug-env" or path_param == "debug-env":
+    if DEBUG_ENDPOINTS and (endpoint == "debug-env" or path_param == "debug-env"):
         return jsonify({
             "path": request.path,
             "endpoint": endpoint,
@@ -486,6 +535,8 @@ def handle_vercel_matched_path():
 
 @app.route("/debug-env")
 def debug_env():
+    if not DEBUG_ENDPOINTS:
+        return jsonify({"error": "disabled (set DASHBOARD_DEBUG=1)"}), 404
     return jsonify({
         "path": request.path,
         "url": request.url,
@@ -512,7 +563,7 @@ def dashboard():
            request.environ.get("RAW_URI", ""))
     if "/api/status" in uri or "/status" in uri or "status" in request.args:
         return get_status()
-    if "debug" in uri or "debug" in request.args:
+    if DEBUG_ENDPOINTS and ("debug" in uri or "debug" in request.args):
         return jsonify({
             "path": request.path,
             "uri": uri,
@@ -543,15 +594,32 @@ def route_manifest():
 @app.route("/api/status", methods=["GET"])
 @app.route("/api/index/api/status", methods=["GET"])
 def get_status():
-    return jsonify(store.snapshot())
+    snap = store.snapshot()
+    if not snap.get("has_telemetry", False):
+        remote = _kv_load_snapshot()
+        if remote and remote.get("has_telemetry", False):
+            received_at = remote.get("received_at_ms") or 0
+            if epoch_ms() - received_at < 10000:
+                return jsonify(remote)
+    return jsonify(snap)
 
 
 @app.route("/api/telemetry", methods=["POST"])
 @app.route("/api/index/api/telemetry", methods=["POST"])
 def post_telemetry():
+    secret_expected = os.getenv("TELEMETRY_SECRET", "").strip()
+    if secret_expected:
+        secret_given = request.headers.get("X-Telemetry-Secret", "") or request.args.get("secret", "")
+        if secret_given != secret_expected:
+            return jsonify({"error": "Unauthorized telemetry source"}), 401
+
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"error": "Request body must be a JSON object"}), 400
+    # The bridge sends an explicit OFFLINE marker (null readings). Previously this hit the numeric
+    # validator and returned HTTP 400, so the dashboard only went offline via the watchdog.
+    if payload.get("has_telemetry") is False or str(payload.get("link_state", "")).strip().lower() == "disconnected":
+        return jsonify({"ok": True, "data": store.reset_to_disconnected()})
     try:
         return jsonify({"ok": True, "data": store.ingest(payload, "wifi")})
     except (ValueError, TypeError) as exc:
@@ -561,7 +629,85 @@ def post_telemetry():
 @app.route("/api/simulate", methods=["POST"])
 @app.route("/api/index/api/simulate", methods=["POST"])
 def simulate():
-    return jsonify({"error": "Simulation disabled: live hardware telemetry only"}), 403
+    secret_expected = os.getenv("TELEMETRY_SECRET", "").strip()
+    allow_sim = os.getenv("ALLOW_SIMULATION", "1").strip().lower() in {"1", "true", "yes", "on"}
+    if secret_expected and not allow_sim:
+        secret_given = request.headers.get("X-Telemetry-Secret", "") or request.args.get("secret", "")
+        if secret_given != secret_expected:
+            return jsonify({"error": "Unauthorized: Simulation requires valid X-Telemetry-Secret header"}), 403
+
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action", "")).lower().strip()
+
+    sim_map = {
+        "sos": {
+            "sos_active": True,
+            "safety_state": "EMERGENCY",
+            "hazard_type": "MANUAL_SOS",
+            "link_source": "Simulation (Manual SOS)",
+        },
+        "fall": {
+            "accel_magnitude_g": 3.45,
+            "safety_state": "EMERGENCY",
+            "hazard_type": "FALL_DETECTED",
+            "link_source": "Simulation (Impact Fall)",
+        },
+        "high_temp": {
+            "temperature_c": 52.8,
+            "safety_state": "EMERGENCY",
+            "hazard_type": "HIGH_TEMP",
+            "link_source": "Simulation (Thermal Hazard)",
+        },
+        "gas_leak": {
+            "gas_ppm": 720.0,
+            "safety_state": "EMERGENCY",
+            "hazard_type": "GAS_LEAK",
+            "link_source": "Simulation (Gas Hazard)",
+        },
+        "sensor_fault": {
+            "sensor_fault": True,
+            "safety_state": "WARNING",
+            "hazard_type": "SENSOR_FAULT",
+            "link_source": "Simulation (Fault Diagnostic)",
+        },
+        "normal": {
+            "temperature_c": 26.5,
+            "gas_ppm": 45.0,
+            "accel_magnitude_g": 1.01,
+            "accel_x": 0.05,
+            "accel_y": 0.02,
+            "accel_z": 1.0,
+            "sos_active": False,
+            "sensor_fault": False,
+            "safety_state": "NORMAL",
+            "hazard_type": "NONE",
+            "link_source": "Simulation (Normal Safe)",
+        },
+        "clear": {
+            "temperature_c": 25.0,
+            "gas_ppm": 35.0,
+            "accel_magnitude_g": 1.0,
+            "sos_active": False,
+            "sensor_fault": False,
+            "safety_state": "NORMAL",
+            "hazard_type": "NONE",
+            "link_source": "Simulation (Cleared)",
+        }
+    }
+
+    if action not in sim_map:
+        return jsonify({
+            "error": f"Unknown simulation action '{action}'. Supported: {list(sim_map.keys())}"
+        }), 400
+
+    sim_payload = sim_map[action]
+    sim_payload["timestamp_ms"] = epoch_ms()
+    sim_payload["link_state"] = "Connected"
+    sim_payload["has_telemetry"] = True
+
+    result = store.ingest(sim_payload, source="simulator")
+    _kv_save_snapshot(result, force=True)
+    return jsonify({"ok": True, "action": action, "data": result})
 
 
 def serial_reader() -> None:
@@ -627,4 +773,4 @@ def start_serial_reader() -> None:
 start_serial_reader()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=True)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=DEBUG_ENDPOINTS)

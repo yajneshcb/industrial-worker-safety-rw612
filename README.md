@@ -88,10 +88,10 @@ The FRDM-RW612 microcontroller evaluates worker safety every **100 ms** against 
 
 | Hazard Condition | Sensing Input | Edge Detection Rule | Local Actuator Response | Dashboard Event |
 |---|---|---|---|---|
-| **Manual SOS** | SW2 Pushbutton (`GPIO_24`) | Active-low button pressed (highest priority) | Red LED strobe (100 ms) + continuous rapid buzzer alarm | `MANUAL_SOS` (Immediate Emergency) |
+| **Manual SOS** | SW2 Pushbutton (`GPIO_11`) | Active-low button pressed (highest priority) | Red LED strobe (100 ms) + continuous rapid buzzer alarm | `MANUAL_SOS` (Immediate Emergency) |
 | **Worker Fall** | MPU-6050 6-Axis IMU (`GPIO_16`/`17`) | Resultant acceleration $< 0.4\,\text{g}$ (free-fall) followed by $> 2.5\,\text{g}$ (impact) within $1.0\,\text{s}$ | Red LED strobe + emergency buzzer (5.0s latch) | `FALL_DETECTED` (Emergency) |
-| **Critical Gas Leak / Smoke** | MQ-2 Sensor (`GPIO_60` LPADC) | Concentration $\ge 600\,\text{PPM}$ | Red LED strobe + emergency buzzer | `GAS_LEAK` (Critical Emergency) |
-| **Elevated Gas Concentration**| MQ-2 Sensor (`GPIO_60` LPADC) | Concentration $\ge 300\,\text{PPM}$ and $< 600\,\text{PPM}$ | Solid Yellow LED + periodic 200 ms warning chirp | `GAS_LEAK` (Advisory Warning) |
+| **Critical Gas Leak / Smoke** | MQ-2 Sensor (`GPIO_46` GAU ADC) | Concentration $\ge 600\,\text{PPM}$ | Red LED strobe + emergency buzzer | `GAS_LEAK` (Critical Emergency) |
+| **Elevated Gas Concentration**| MQ-2 Sensor (`GPIO_46` GAU ADC) | Concentration $\ge 300\,\text{PPM}$ and $< 600\,\text{PPM}$ | Solid Yellow LED + periodic 200 ms warning chirp | `GAS_LEAK` (Advisory Warning) |
 | **High Thermal Hazard** | P3T1755 Sensor (`GPIO_16`/`17`) | Ambient temperature $\ge 50.0\,^{\circ}\text{C}$ | Red LED strobe + emergency buzzer | `HIGH_TEMP` (Emergency) |
 | **Elevated Temperature** | P3T1755 Sensor (`GPIO_16`/`17`) | Ambient temperature $\ge 40.0\,^{\circ}\text{C}$ and $< 50.0\,^{\circ}\text{C}$ | Solid Yellow LED + periodic 200 ms warning chirp | `HIGH_TEMP` (Warning) |
 | **Sensor Disconnect / Fault**| I²C / LPADC bus monitoring | Consecutive read failures $\ge 5$ | Pulsing Yellow LED (1 Hz: 500 ms ON / 500 ms OFF) + warning chirp | `SENSOR_FAULT` (Warning) |
@@ -116,8 +116,8 @@ The breadboard prototype operates directly from the USB Type-C supply from the h
 | **P3T1755** *(Onboard)* | - | `GPIO_16` (SDA), `GPIO_17` (SCL) | Flexcomm 2 I²C | Slave Address `0x48` |
 | **MPU-6050** *(External)*| `SDA` | `GPIO_16` (Header `J5` Pin 9) | Flexcomm 2 I²C | Slave Address `0x68` (Shared bus) |
 | | `SCL` | `GPIO_17` (Header `J5` Pin 10) | Flexcomm 2 I²C | Onboard 4.7kΩ pull-ups present |
-| **MQ-2 Gas Sensor** | `AOUT` | `GPIO_60` (Arduino `A0` / `J3` Pin 2) | LPADC0 Channel 0 | 0 to 3.3V analog input |
-| **SOS Button** *(Onboard)*| `SW2` | `GPIO_24` (`AON_WAKEUP`) | Digital Input | Active Low with internal pull-up |
+| **MQ-2 Gas Sensor** | `AOUT` | `GPIO_46` (Header `J7` Pin 3) | GAU GPADC0 Channel CH4 | 0 to 1.2V ADC range (requires 47k/10k divider) |
+| **SOS Button** *(Onboard)*| `SW2` | `GPIO_11` (Port 0 Pin 11) | Digital Input | Active Low with falling-edge interrupt |
 
 ### 3. Actuator Wiring
 | Actuator | Module / Lead | FRDM-RW612 Pin | Protection | Behavior |
@@ -138,14 +138,15 @@ The breadboard prototype operates directly from the USB Type-C supply from the h
     │                      │
     │  [J5-Pin 9]  GPIO_16 ├────────────────────────────> MPU-6050 (SDA)
     │  [J5-Pin 10] GPIO_17 ├────────────────────────────> MPU-6050 (SCL)
-    │  [J3-Pin 2]  GPIO_60 ├────────────────────────────> MQ-2 Gas (AOUT)
+    │  [J7-Pin 3]  GPIO_46 ├───[ 10k to GND / 47k to AOUT ]──< MQ-2 Gas (AOUT)
     │                      │
     │              GPIO_5  ├───[ 220 Ω ]───(>|)─────────> GREEN LED (Normal) ───┐
     │              GPIO_6  ├───[ 220 Ω ]───(>|)─────────> YELLOW LED (Warning)──┤
     │              GPIO_7  ├───[ 220 Ω ]───(>|)─────────> RED LED (Emergency)───┤
     │              GPIO_4  ────────────────[ BUZZER (+) ]─> ACTIVE BUZZER ──────┤
     │                      │                                                    │
-    │  [Onboard SW2]GPIO_24│ (Internal SOS Push Button)                         │
+    │  [Onboard SW2]GPIO_11│ (Internal SOS Push Button, active LOW)             │
+    │  [Console]   GPIO_24 │ (MCU-Link USART DATA to Host Laptop)               │
     └──────────────────────┘                                                    │
                                                                    GND RAIL <───┘
 ```
@@ -172,84 +173,84 @@ The repository features a high-performance, dark SCADA-inspired monitoring dashb
 
 ```text
 industrial-worker-safety-rw612/
-├── .gitignore                          # Git exclusion rules
+├── .gitignore                          # Git exclusion rules (machine-agnostic)
 ├── .project / .cproject                # MCUXpresso IDE project configurations
-├── CMakeLists.txt                      # CMake build configuration for Arm GCC
-├── CMakePresets.json                   # Build presets
+├── CMakeLists.txt                      # Freestanding MCUXpresso SDK CMake build
+├── CMakePresets.json                   # Portable CMake presets (Debug & Release)
+├── prj.conf                            # Freestanding project driver & segment config
 ├── FRDM_RW612_WorkerSafety.mex         # MCUXpresso Config Tools (Pins, Clocks, Peripherals)
 ├── Procfile                            # Cloud process file for containerized hosts
 ├── README.md                           # Master project documentation
 ├── requirements.txt                    # Python dependencies for dashboard
+├── serial_bridge.py                    # Host USB serial bridge to dashboard
 ├── vercel.json                         # Vercel serverless deployment routing
 │
 ├── api/                                # Vercel Serverless Function
 │   └── index.py                        # WSGI entrypoint for Vercel deployment
 │
-├── board/                              # FRDM-RW612 Board Support Package
-│   ├── board.h / board.c               # Hardware definitions and board initialization
-│   ├── clock_config.h / clock_config.c # 260MHz System PLL and Flexcomm clocking
-│   ├── pin_mux.h / pin_mux.c           # GPIO directions and pin multiplexing
-│   └── peripherals.h / peripherals.c   # Peripheral configuration stubs
-│
 ├── dashboard/                          # Mission Control Web Dashboard
 │   ├── dashboard_app.py                # Flask server, REST API & USB serial bridge
-│   ├── requirements.txt                # Dashboard Python dependencies
-│   ├── vercel.json                     # Standalone Vercel configuration
-│   ├── static/                         # Frontend Static Assets
-│   │   ├── safety-mark.svg             # Application brand icon
-│   │   ├── css/dashboard.css           # Mission control dark theme stylesheet
-│   │   └── js/dashboard.js             # Real-time state polling, audio & sparklines
-│   └── templates/
-│       └── index.html                  # Dashboard HTML5 template
+│   ├── static/                         # Frontend Static Assets (CSS, JS, SVG)
+│   └── templates/                      # Dashboard HTML5 template
 │
-├── device/                             # CMSIS Core & RW612 Definitions
-│   ├── RW612.h                         # Device register mappings and IRQ channels
-│   └── system_RW612.h / .c             # System core clock and initialization
-│
-├── docs/                               # Engineering Documentation & Academic Papers
-│   ├── pinout_mapping.md               # Detailed breadboard wiring and pinout notes
+├── docs/                               # Engineering Documentation & Guides
+│   ├── BUILD.md                        # Complete SDK & Arm GCC build instructions
+│   ├── BRING_UP.md                     # Hardware bring-up and diagnostics guide
+│   ├── pinout_mapping.md               # Verified breadboard wiring and pinout notes
 │   ├── system_architecture.md          # Data pipeline and architectural block diagrams
-│   ├── Industrial_Worker_Safety_Synopsis.docx # Project Synopsis document
 │   └── paper/                          # IEEE Conference Paper files
-│       ├── worker_safety_monitor_ieee_final.tex # IEEE conference paper LaTeX source
-│       └── IEEEtran.cls                # IEEE LaTeX formatting class
 │
-├── drivers/                            # NXP MCUXpresso SDK Drivers
-│   ├── fsl_clock.h                     # Clock gating driver
-│   ├── fsl_common.h                    # SDK common definitions
-│   ├── fsl_debug_console.h / .c        # Flexcomm UART debug console driver
-│   └── fsl_i2c.h / .c                  # Flexcomm I²C master driver
+├── legacy_stubs/                       # Archived initial stubs replaced by SDK
 │
 └── source/                             # Application Firmware Source Code
     ├── main.c                          # Main execution loop & system sequencer
-    ├── app_config.h                    # Safety thresholds, timing, and network constants
+    ├── app_config.h                    # Pin mappings, thresholds, timing constants
+    ├── app_secrets.h.example           # Wi-Fi credentials template (git-ignored)
+    ├── fault_handler.h / .c            # Cortex-M33 hardware fault diagnostics
+    ├── timebase.h / .c                 # DWT cycle counter exact 100ms timing
+    ├── board_port/                     # Board Porting Layer
+    │   ├── hardware_init.h / .c        # Clocks, power, ADC and I2C attach
+    │   └── pin_mux.h / .c              # Flexcomm, ADC, GPIO pin muxing
     ├── alerts/                         # Actuator Subsystems
-    │   ├── alert_manager.h / .c        # Alert state machine and actuator coordinator
-    │   ├── buzzer.h / .c               # Active buzzer driver (chirp & urgent pulses)
-    │   ├── leds.h / .c                 # Status LEDs driver (Green, Yellow, Red)
-    │   └── button_sos.h / .c           # SW2 SOS input interrupt & latching
+    │   ├── alert_manager.h / .c        # Alert state machine and coordinator
+    │   ├── buzzer.h / .c               # Active buzzer driver (SDK lpc_gpio)
+    │   ├── leds.h / .c                 # Status LEDs driver (SDK lpc_gpio)
+    │   └── button_sos.h / .c           # SW2 SOS interrupt & latching (SDK lpc_gpio)
     ├── edge_logic/                     # Edge Computing Engine
     │   └── safety_decision.h / .c      # Hazard classification & sensor fault logic
     ├── sensors/                        # Sensor Acquisition Drivers
     │   ├── sensor_temp.h / .c          # P3T1755 digital temperature driver (I2C)
     │   ├── sensor_mpu6050.h / .c       # MPU-6050 6-axis IMU & fall detection (I2C)
-    │   └── sensor_gas.h / .c           # MQ-2 analog gas & smoke driver (LPADC)
+    │   └── sensor_gas.h / .c           # MQ-2 gas & smoke driver (SDK cns_adc)
     └── wireless/                       # Wireless Telemetry & Offline Buffering
-        ├── alert_reporter.h / .c       # Telemetry serialization & 16-packet ring buffer
-        └── wifi_manager.h / .c         # Wi-Fi link management and auto-reconnect
+        ├── alert_reporter.h / .c       # Telemetry serialization & offline buffer
+        └── wifi_manager.h / .c         # Wi-Fi status management
 ```
 
 ---
 
 ## 🚀 Getting Started
 
-### 1. Firmware Setup (MCUXpresso IDE)
+### 1. Firmware Setup & Build (CMake or MCUXpresso IDE)
+
+#### Option A: Building via CMake & Arm GNU Toolchain (Recommended)
+See the full [Build Guide](docs/BUILD.md) for complete details.
+```powershell
+# 1. Set environment variables to your local SDK and Arm GCC paths
+$env:MCUX_SDK_PATH = "D:/MCUXpresso/Example/matter_mcuxpresso/mcuxsdk/mcuxsdk"
+$env:ARMGCC_DIR    = "C:/path/to/arm-gnu-toolchain"
+
+# 2. Configure and build using CMake Presets
+cmake --preset debug
+cmake --build --preset debug
+```
+
+#### Option B: MCUXpresso IDE
 1. Install **MCUXpresso IDE** (v11.8+ recommended) with the **FRDM-RW612 SDK**.
 2. Open MCUXpresso and select **File -> Import -> Existing Projects into Workspace**.
 3. Choose the repository root directory.
-4. Verify Wi-Fi network credentials in `source/app_config.h`:
-   - `WIFI_SSID_DEFAULT`: `"realme P1 5G eb01"`
-   - `WIFI_PASSWORD_DEFAULT`: `"yajjugowda"`
+4. Copy `source/app_secrets.h.example` to `source/app_secrets.h` (git-ignored) and configure your local Wi-Fi SSID/password.
+   - **Note:** Wi-Fi transmit is documented and ready for stack extension (`WIFI_STACK_AVAILABLE=0`); telemetry currently leaves the board reliably as `[TELEMETRY]` JSON lines on the console (MCU-Link VCOM), forwarded by `serial_bridge.py`.
 5. Connect the FRDM-RW612 board via the USB Type-C `MCU-Link` port.
 6. Click **Build** and **Debug** to flash the firmware onto the board.
 7. Open a serial terminal (115200 8N1) on the MCU-Link VCOM port to view real-time logs.

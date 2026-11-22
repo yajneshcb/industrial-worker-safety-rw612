@@ -17,10 +17,21 @@ Before powering up the board, cross-check the physical wiring against the follow
 | **Toxic Gas & Smoke (MQ-2)** | **J7 Pin 3 (GPIO_46)** | **GAU GPADC0 Channel CH4** | **CRITICAL: Resistor divider required!** (See Section 2) |
 | **Emergency SOS Button (SW2)** | **Onboard SW2 (GPIO_11)** | Digital Input, Port 0 Pin 11 | Active LOW, falling-edge interrupt (`GPIO_INTA_IRQn`) |
 | **Active Buzzer Actuator** | Header D4 (`GPIO_4`) | Digital Output, Port 0 Pin 4 | Active HIGH 3.3V trigger |
-| **Status LED: Normal (Green)** | Header D5 (`GPIO_5`) | Digital Output, Port 0 Pin 5 | Active HIGH via 220 Ω current limiting resistor |
-| **Status LED: Warning (Yellow)**| Header D6 (`GPIO_6`) | Digital Output, Port 0 Pin 6 | Active HIGH via 220 Ω current limiting resistor |
-| **Status LED: Emergency (Red)** | Header D7 (`GPIO_7`) | Digital Output, Port 0 Pin 7 | Active HIGH via 220 Ω current limiting resistor |
-| **MCU-Link Debug Console** | Onboard Virtual COM port | Flexcomm 3 USART (`GPIO_24`)| 115200 baud, 8-N-1, no parity |
+| **Component** | **FRDM-RW612 Header Pin** | **Official Header Label** | **Signal / GPIO** | **Notes** |
+|---|---|---|---|---|
+| **MPU-6050: VCC** | **Header J3 Pin 4** | `ARD 3V3` | `3V3` | 3.3V power |
+| **MPU-6050: GND** | **Header J3 Pin 12 / 14** | `ARD GND` | `GND` | Ground rail |
+| **MPU-6050: SCL** | **Header J2 Pin 20** | `ARD_D19` | `GPIO17` (FC2 I2C SCL) | Clock line (also on J7 Pin 6) |
+| **MPU-6050: SDA** | **Header J2 Pin 18** | `ARD_D18` | `GPIO16` (FC2 I2C SDA) | Data line (also on J7 Pin 8) |
+| **MPU-6050: AD0** | Common GND rail | `GND` | `GND` | Sets address to `0x68` |
+| **MQ-2: VCC** | **Header J3 Pin 10** | `ARD 5V0` | `5V0` | 5.0V heater supply |
+| **MQ-2: GND** | **Header J3 Pin 12 / 14** | `ARD GND` | `GND` | Ground rail |
+| **MQ-2: AOUT** | **Header J7 Pin 3** | `LCD_MOSI` | `GPIO46` (ADC0 CH4) | Connect via 36k/10k divider |
+| **Active Buzzer (+)** | **Header J1 Pin 1** | `GPIO4 (I2S)` | `GPIO_4` | Active HIGH 3.3V trigger |
+| **Status LED: Normal (Green)** | **Header J1 Pin 7** | `GPIO5 (MCLK)` | `GPIO_5` | Active HIGH via 220 Ω resistor |
+| **Status LED: Warning (Yellow)**| **Header J2 Pin 6** | `GPIO6 (ARD_D10)` | `GPIO_6` | Active HIGH via 220 Ω resistor |
+| **Status LED: Emergency (Red)** | **Header J2 Pin 12** | `GPIO7 (ARD_D13)` | `GPIO_7` | Active HIGH via 220 Ω resistor |
+| **MCU-Link Debug Console** | Onboard USB J10 | Flexcomm 3 USART | `GPIO_24` (RX) / `GPIO_26` (TX) | 115200 baud, 8-N-1 |
 
 ---
 
@@ -32,12 +43,13 @@ Before powering up the board, cross-check the physical wiring against the follow
 > The RW612 GAU ADC reference is **1.2 V** (`kADC_Vref1P2V`).
 
 ### Resistor Divider Calculation:
-- **$R_{top}$ (AOUT side):** $47\text{ k}\Omega$
+- **$R_{top}$ (AOUT side):** $36\text{ k}\Omega$
 - **$R_{bottom}$ (GND side):** $10\text{ k}\Omega$
 - **Divider Ratio:**
-  $$\text{Ratio} = \frac{R_{bottom}}{R_{top} + R_{bottom}} = \frac{10\text{ k}\Omega}{47\text{ k}\Omega + 10\text{ k}\Omega} = \frac{10}{57} \approx 0.1754$$
+  $$\text{Ratio} = \frac{R_{bottom}}{R_{top} + R_{bottom}} = \frac{10\text{ k}\Omega}{36\text{ k}\Omega + 10\text{ k}\Omega} = \frac{10}{46} \approx 0.2174$$
 - When $V_{AOUT} = 5.0\text{ V}$, the pin voltage is:
-  $$V_{pin} = 5.0\text{ V} \times 0.1754 = 0.877\text{ V} \quad (\le 1.2\text{ V safe range})$$
+  $$V_{pin} = 5.0\text{ V} \times 0.2174 = 1.087\text{ V} \quad (\le 1.2\text{ V safe range})$$
+- When clean air is present ($V_{AOUT} \approx 0.9\text{--}1.0\text{ V}$), the pin voltage is $\approx 0.20\text{--}0.22\text{ V}$, staying safely above the GAU ADC $0.2\text{ V}$ minimum operating floor.
 
 In `source/app_config.h`, the driver converts the measured pin voltage back through this ratio:
 $$V_{AOUT} = \frac{V_{pin}}{\text{Ratio}}$$

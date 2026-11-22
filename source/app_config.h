@@ -87,12 +87,12 @@ void BOARD_InitHardware(void);
 #define APP_SOS_GPIO_PORT             0U
 #define APP_SOS_GPIO_PIN              11U                      /* Onboard SW2 button */
 
-/* ---- Actuator GPIOs (Port 0) ---- */
+/* ---- Actuator GPIOs (Port 0) — Official Quick Start Guide Mappings ---- */
 #define APP_ACTUATOR_GPIO_PORT        0U
-#define BOARD_BUZZER_GPIO_PIN         4U                       /* Header J1 Pin 1 */
-#define BOARD_LED_NORMAL_PIN          5U                       /* Header J1 Pin 3 (Green) */
-#define BOARD_LED_WARNING_PIN         6U                       /* Header J2 Pin 6 (Yellow) */
-#define BOARD_LED_EMERGENCY_PIN       7U                       /* Header J2 Pin 12 (Red) */
+#define BOARD_BUZZER_GPIO_PIN         4U                       /* Header J1 Pin 1 (GPIO4 / I2S) */
+#define BOARD_LED_NORMAL_PIN          5U                       /* Header J1 Pin 7 (GPIO5 / MCLK - Green LED) */
+#define BOARD_LED_WARNING_PIN         6U                       /* Header J2 Pin 6 (GPIO6 / ARD_D10 - Yellow LED) */
+#define BOARD_LED_EMERGENCY_PIN       7U                       /* Header J2 Pin 12 (GPIO7 / ARD_D13 - Red LED) */
 
 /* Set to 1 if using an active-LOW buzzer module; 0 for standard active-HIGH (default) */
 #define BUZZER_ACTIVE_LOW             0

@@ -43,4 +43,10 @@ mcux_add_include(
              source/wireless
 )
 
+mcux_add_armgcc_linker_script(
+    TARGETS debug release flash_debug flash_release Debug Release
+    BASE_PATH ${SdkRootDirPath}
+    LINKER devices/Wireless/RW/RW612/gcc/RW612_flash.ld
+)
+
 mcux_convert_binary(BINARY ${APPLICATION_BINARY_DIR}/${MCUX_SDK_PROJECT_NAME}.bin)

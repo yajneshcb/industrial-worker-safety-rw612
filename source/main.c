@@ -67,7 +67,7 @@ static GasSensorData_t    s_currentGas;
 static SafetyEvaluation_t s_lastEvaluation;
 
 /* Print a float as "[-]dd.dd" without requiring float printf support */
-static void App_PrintFloat2Dec(float val)
+__attribute__((unused)) static void App_PrintFloat2Dec(float val)
 {
     int32_t centi = (int32_t)(val * 100.0f);
     const char *sign = "";

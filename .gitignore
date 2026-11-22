@@ -1,8 +1,10 @@
 # Build directory
 build/
-bin/
+bin/*
+!bin/FRDM_RW612_WorkerSafety.bin
 *.elf
 *.bin
+!bin/FRDM_RW612_WorkerSafety.bin
 *.hex
 *.axf
 *.map

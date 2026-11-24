@@ -456,50 +456,44 @@
         </article>
       </section>
 
-      <!-- Section 04: Hardware Bench Simulation -->
-      <section class="simulation-section" aria-label="Hardware bench simulation">
-        <article class="panel simulation-panel">
+      <!-- Section 04: Automatically recorded hardware telemetry -->
+      <section class="telemetry-log-section" aria-label="Telemetry sample log">
+        <article class="panel telemetry-log-panel">
           <div class="panel-heading">
             <div>
               <div class="panel-titleline">
                 <span class="section-index">04</span>
-                <h2>Hardware bench simulation</h2>
+                <h2>Telemetry sample log</h2>
               </div>
-              <p>Simulate edge telemetry triggers &amp; safety transitions (REST POST to /api/simulate)</p>
+              <p>Hardware samples are recorded automatically when telemetry is accepted by the dashboard.</p>
             </div>
-            <span class="sim-badge">BENCH TEST HARNESS</span>
+            <button class="icon-button" id="exportTelemetryCsv" type="button" title="Export recorded telemetry samples as CSV">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 17v3h14v-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span>CSV</span>
+            </button>
           </div>
-          <div class="sim-actions-grid">
-            <button class="sim-btn sim-normal" data-action="normal" type="button" title="Baseline safe telemetry">
-              <span class="sim-btn-icon">✓</span>
-              <span class="sim-btn-title">NORMAL SAFE</span>
-              <small>26.5°C · 45 INDEX · 1.0g</small>
-            </button>
-            <button class="sim-btn sim-sos" data-action="sos" type="button" title="Manual SOS button press">
-              <span class="sim-btn-icon">⚠</span>
-              <span class="sim-btn-title">MANUAL SOS</span>
-              <small>Emergency override (SW2)</small>
-            </button>
-            <button class="sim-btn sim-fall" data-action="fall" type="button" title="Free-fall and impact spike">
-              <span class="sim-btn-icon">⤓</span>
-              <span class="sim-btn-title">FALL IMPACT</span>
-              <small>&lt;0.4g freefall → 3.45g shock</small>
-            </button>
-            <button class="sim-btn sim-temp" data-action="high_temp" type="button" title="Thermal emergency threshold">
-              <span class="sim-btn-icon">🌡</span>
-              <span class="sim-btn-title">HIGH TEMP</span>
-              <small>52.8°C thermal hazard</small>
-            </button>
-            <button class="sim-btn sim-gas" data-action="gas_leak" type="button" title="Toxic/flammable gas threshold">
-              <span class="sim-btn-icon">☁</span>
-              <span class="sim-btn-title">GAS LEAK</span>
-              <small>720 INDEX high output</small>
-            </button>
-            <button class="sim-btn sim-fault" data-action="sensor_fault" type="button" title="Simulate sensor fault">
-              <span class="sim-btn-icon">⚡</span>
-              <span class="sim-btn-title">SENSOR FAULT</span>
-              <small>ADC / I2C bus error</small>
-            </button>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>TIME</th>
+                  <th>PACKET</th>
+                  <th>TEMP °C</th>
+                  <th>MOTION g</th>
+                  <th>GAS INDEX</th>
+                  <th>STATE / HAZARD</th>
+                </tr>
+              </thead>
+              <tbody id="telemetryLogRows">
+                <tr><td colspan="6" class="empty-row">Waiting for accepted hardware telemetry…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-foot">
+            <span><i class="small-live-dot"></i><span id="telemetryLogCount">0</span> / 120 SAMPLES IN SESSION BUFFER</span>
+            <span>NEWEST FIRST · USB DIRECT SAMPLES SAVED IN THIS BROWSER</span>
           </div>
         </article>
       </section>

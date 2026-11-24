@@ -18,7 +18,9 @@
     pollTimer: null,
     serialPort: null,
     serialReader: null,
-    serialConnected: false
+    serialConnected: false,
+    serialApiErrorShown: false,
+    serialHistory: []
   };
 
   const themeColors = {
@@ -209,6 +211,7 @@
 
       // Section 02: Incident Log
       renderIncidents(data.incidents || []);
+      renderTelemetryHistory(data.history || []);
 
       // Section 03: Node Link Diagnostics
       $('#nodeIndicator').className = 'node-indicator';
@@ -304,6 +307,7 @@
     // Section 02 & 03
     renderLink(data);
     renderIncidents(data.incidents || []);
+    renderTelemetryHistory(data.history || []);
 
     // Sparklines
     const samples = (data.history || []).filter((item) => item.temperature_c !== null);
@@ -389,6 +393,45 @@
     }).join('');
   }
 
+  function renderTelemetryHistory(history) {
+    const rows = $('#telemetryLogRows');
+    if (!rows) return;
+    const allSamples = mergeTelemetryHistory(history, state.serialHistory);
+    const recent = [...allSamples].reverse().slice(0, 20);
+    $('#telemetryLogCount').textContent = allSamples.length;
+    if (!recent.length) {
+      rows.innerHTML = '<tr><td colspan="6" class="empty-row">Waiting for accepted hardware telemetry…</td></tr>';
+      return;
+    }
+    rows.innerHTML = recent.map((sample) => {
+      const receivedAt = Number(sample.received_at_ms);
+      const time = Number.isFinite(receivedAt) && receivedAt > 0 ? formatTime(new Date(receivedAt).toISOString()) : '—';
+      const stateName = String(sample.safety_state || 'OFFLINE');
+      const hazard = String(sample.hazard_type || 'NONE');
+      return `<tr><td>${escapeHTML(time)}</td><td>${escapeHTML(sample.id ?? '—')}</td><td>${escapeHTML(fmt(sample.temperature_c, 1))}</td><td>${escapeHTML(fmt(sample.accel_magnitude_g, 2))}</td><td>${escapeHTML(fmt(sample.gas_ppm, 0))}</td><td><span class="severity-tag ${stateName.toLowerCase()}">${escapeHTML(stateName)}</span> · ${escapeHTML(hazard)}</td></tr>`;
+    }).join('');
+  }
+
+  function mergeTelemetryHistory(serverSamples, browserSamples) {
+    const unique = new Map();
+    [...serverSamples, ...browserSamples].forEach((sample) => {
+      const key = `${sample.received_at_ms ?? sample.timestamp_ms ?? ''}:${sample.id ?? ''}`;
+      unique.set(key, sample);
+    });
+    return [...unique.values()]
+      .sort((a, b) => Number(a.received_at_ms || a.timestamp_ms || 0) - Number(b.received_at_ms || b.timestamp_ms || 0))
+      .slice(-120);
+  }
+
+  function persistWebSerialSample(sample) {
+    state.serialHistory = mergeTelemetryHistory(state.serialHistory, [sample]);
+    try {
+      localStorage.setItem('rw612-web-serial-history', JSON.stringify(state.serialHistory));
+    } catch (error) {
+      console.warn('Could not persist Web Serial history in this browser:', error);
+    }
+  }
+
   async function fetchStatus() {
     try {
       const response = await fetch('/api/status', { cache: 'no-store', headers: { 'Accept': 'application/json' } });
@@ -424,6 +467,15 @@
   function exportJSON() {
     downloadFile(`rw612-incidents-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(state.incidents, null, 2), 'application/json');
     showToast(`Exported ${state.incidents.length} event(s) to JSON.`);
+  }
+
+  function exportTelemetryCSV() {
+    const samples = mergeTelemetryHistory(state.data?.history || [], state.serialHistory);
+    const columns = ['received_at_ms', 'timestamp_ms', 'id', 'temperature_c', 'accel_magnitude_g', 'accel_x', 'accel_y', 'accel_z', 'gas_ppm', 'safety_state', 'hazard_type', 'source'];
+    const quote = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const csv = [columns.join(','), ...samples.map((sample) => columns.map((key) => quote(sample[key])).join(','))].join('\r\n');
+    downloadFile(`rw612-telemetry-${new Date().toISOString().slice(0, 10)}.csv`, csv, 'text/csv;charset=utf-8');
+    showToast(`Exported ${samples.length} telemetry sample(s) to CSV.`);
   }
 
   function stopAudio() {
@@ -503,22 +555,6 @@
     } catch (error) { showToast(error.message); }
   }
 
-  async function triggerSimulation(action) {
-    try {
-      const resp = await fetch('/api/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
-      });
-      const res = await resp.json();
-      if (!resp.ok) throw new Error(res.error || `HTTP ${resp.status}`);
-      if (res.data) renderStatus(res.data);
-      showToast(`Simulation triggered: ${action.replace('_', ' ').toUpperCase()}`);
-    } catch (err) {
-      showToast(`Simulation error: ${err.message}`);
-    }
-  }
-
   async function disconnectWebSerial() {
     if (state.serialReader) {
       try {
@@ -581,27 +617,28 @@
           const jsonText = line.split('[TELEMETRY]')[1].trim();
           try {
             const payload = JSON.parse(jsonText);
-            fetch('/api/telemetry', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            }).then(r => r.json()).then(res => {
-              if (res.data) renderStatus(res.data);
-            }).catch(() => {});
-
             payload.link_state = 'Connected';
             payload.link_source = 'USB Serial (Web Serial)';
             payload.has_telemetry = true;
-            payload.received_at_ms = Date.now();
-            payload.safety_state = payload.state || payload.safety_state || 'NORMAL';
-            payload.hazard_type = payload.hazard || payload.hazard_type || 'NONE';
-            payload.temperature_c = payload.temp ?? payload.temperature_c;
-            payload.gas_ppm = payload.gas ?? payload.gas_ppm;
-            payload.accel_magnitude_g = payload.accel ?? payload.accel_magnitude_g;
-            payload.sos_active = payload.sos ?? payload.sos_active ?? false;
-            renderStatus(payload);
+            const response = await fetch('/api/telemetry', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (!response.ok || !result.ok || !result.data) {
+              throw new Error(result.error || `Dashboard rejected telemetry (HTTP ${response.status})`);
+            }
+            state.serialApiErrorShown = false;
+            const acceptedSample = result.data.history?.[result.data.history.length - 1];
+            if (acceptedSample) persistWebSerialSample(acceptedSample);
+            renderStatus(result.data);
           } catch (pe) {
-            console.debug('JSON parse error from serial line:', pe);
+            console.error('Serial telemetry was not recorded:', pe);
+            if (!state.serialApiErrorShown) {
+              showToast(`Telemetry not recorded: ${pe.message}`);
+              state.serialApiErrorShown = true;
+            }
           }
         }
       }
@@ -617,19 +654,13 @@
     $('#hazardFilter').addEventListener('change', () => renderIncidents(state.incidents));
     $('#exportCsv').addEventListener('click', exportCSV);
     $('#exportJson').addEventListener('click', exportJSON);
+    $('#exportTelemetryCsv').addEventListener('click', exportTelemetryCSV);
     $('#audioButton').addEventListener('click', toggleAudio);
 
     const serialBtn = $('#serialConnectBtn');
     if (serialBtn) {
       serialBtn.addEventListener('click', toggleWebSerial);
     }
-
-    document.querySelectorAll('.sim-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const action = btn.dataset.action;
-        if (action) triggerSimulation(action);
-      });
-    });
 
     const themeBtn = $('#themeToggle');
     if (themeBtn) {
@@ -646,6 +677,11 @@
       $('#connectionText').textContent = 'BROWSER OFFLINE';
     });
   }
+
+  try {
+    const storedSerialHistory = JSON.parse(localStorage.getItem('rw612-web-serial-history') || '[]');
+    if (Array.isArray(storedSerialHistory)) state.serialHistory = storedSerialHistory.slice(-120);
+  } catch (_) { }
 
   // Initialize theme from storage or preference
   let initialTheme = 'dark';

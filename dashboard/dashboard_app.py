@@ -188,10 +188,17 @@ class TelemetryStore:
     def _history_point_locked(self) -> dict[str, Any]:
         return {
             "timestamp_ms": self.state.get("timestamp_ms", epoch_ms()),
+            "received_at_ms": self.state.get("received_at_ms", epoch_ms()),
+            "id": self.state.get("id"),
             "temperature_c": self.state.get("temperature_c"),
             "gas_ppm": self.state.get("gas_ppm"),
             "accel_magnitude_g": self.state.get("accel_magnitude_g"),
+            "accel_x": self.state.get("accel_x"),
+            "accel_y": self.state.get("accel_y"),
+            "accel_z": self.state.get("accel_z"),
             "safety_state": self.state.get("safety_state", "OFFLINE"),
+            "hazard_type": self.state.get("hazard_type", "NONE"),
+            "source": self.state.get("source", "none"),
         }
 
     def _record_event_locked(self, severity: str, message: str, hazard: str) -> None:

@@ -12,7 +12,7 @@
  *  - GPIO_5:  Status LED Normal (Green)
  *  - GPIO_6:  Status LED Warning (Yellow)
  *  - GPIO_7:  Status LED Emergency (Red)
- *  - GPIO_46: GAU GPADC0 Channel 4 (Header J7 Pin 3, MQ-2 analog voltage via divider)
+ *  - GPIO_46: ADC0 Channel 4 input (Header J7 Pin 3, MQ-2 analog voltage via divider)
  */
 
 #include "pin_mux.h"
@@ -43,6 +43,9 @@ void BOARD_InitPins(void)
     /* 4. Onboard Emergency SOS Push Button (SW2) on GPIO_11 */
     IO_MUX_SetPinMux(IO_MUX_GPIO11);
 
-    /* 5. Enable clock for GPIO Port 0 module */
+    /* 5. Select the J7-3/GPIO46 pad function used by ADC0 channel 4. */
+    IO_MUX_SetPinMux(IO_MUX_GPIO46);
+
+    /* 6. Enable clock for GPIO Port 0 module */
     GPIO_PortInit(GPIO, 0U);
 }

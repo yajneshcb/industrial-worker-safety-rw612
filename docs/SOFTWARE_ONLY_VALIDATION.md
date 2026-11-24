@@ -16,7 +16,16 @@ $env:PORT = "5000"
 py -3 dashboard\dashboard_app.py
 ```
 
-Open `http://127.0.0.1:5000`. Use the dashboard's demo controls to exercise normal, warning, emergency, fall, SOS, and sensor-fault display states. The demo controls inject software samples; they do not represent readings from a physical sensor.
+Open `http://127.0.0.1:5000`. The page no longer exposes bench simulation controls. To inject a software-only emergency sample for dashboard validation, send this from a second PowerShell terminal:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:5000/api/simulate `
+  -ContentType "application/json" `
+  -Body '{"action":"sos"}'
+```
+
+The API simulation injects software data; it does not represent a reading from a physical sensor.
 
 ## Check the telemetry API
 
@@ -47,7 +56,7 @@ Invoke-RestMethod -Method Post `
 Invoke-RestMethod http://127.0.0.1:5000/api/status
 ```
 
-The status response should show the submitted readings and `has_telemetry: true`; the browser should reflect the new state on its next poll. Repeat with `temp = 52` and `state = "NORMAL"` to check that the dashboard promotes a critical temperature to emergency. Post `{"action":"normal"}` to `/api/simulate` or use the Clear/Reset demo action to restore the baseline.
+The status response should show the submitted readings and `has_telemetry: true`; the browser should reflect the new state on its next poll and show the accepted sample in the telemetry log. Repeat with `temp = 52` and `state = "NORMAL"` to check that the dashboard promotes a critical temperature to emergency. Restore the baseline by posting `{"action":"normal"}` to `/api/simulate`.
 
 ## What this does and does not establish
 

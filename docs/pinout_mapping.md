@@ -72,7 +72,7 @@ The host machine compiling firmware needs the RW612 MCUXpresso SDK and the exten
 ## Firmware/hardware caveats
 
 - Current firmware telemetry is available over USB serial. The firmware Wi-Fi manager is still a placeholder; the board does not yet POST telemetry to the dashboard over Wi-Fi.
-- The ADC pin and divider are mapped in source, but the full sensor-to-dashboard path still needs to be validated on a real board.
+- The firmware selects the GPIO46 pad mux and GAU GPADC0 channel 4 for J7-3; verify the full sensor-to-dashboard path on a real board with measured divider voltage and live ADC output.
 - `gas` is an uncalibrated relative index while `MQ2_R0_OHMS` is zero. Do not call it PPM or use it as a certified gas alarm.
 
 ## References

@@ -28,9 +28,9 @@ The Flask development server used by `python dashboard_app.py` is intended for l
 
 ## Dashboard contents
 
-The interface shows the NORMAL / WARNING / EMERGENCY state, live clock and connection health; temperature with 40 °C and 50 °C markers and min/max readings; motion magnitude, tri-axial vectors and fall counter; the MQ-2 relative output index with demonstration limits at 300 / 600; a visual twin for green/yellow/red outputs and the buzzer; a timestamped/filterable incident log with CSV and JSON exports; and six bench simulation actions. The API retains the legacy `gas_ppm` field name for compatibility, but this firmware's uncalibrated MQ-2 value is not PPM.
+The interface shows the NORMAL / WARNING / EMERGENCY state, live clock and connection health; temperature with 40 °C and 50 °C markers and min/max readings; motion magnitude, tri-axial vectors and fall counter; the MQ-2 relative output index with demonstration limits at 300 / 600; a visual twin for green/yellow/red outputs and the buzzer; a timestamped/filterable incident log; and a telemetry sample log with CSV export. Each accepted hardware telemetry packet is added to the session history automatically. The API retains the legacy `gas_ppm` field name for compatibility, but this firmware's uncalibrated MQ-2 value is not PPM.
 
-The in-memory event log retains up to 500 events and the trend buffer up to 120 samples. Both reset when the process restarts. The UI polls `GET /api/status` once per second.
+The in-memory event log retains up to 500 events and the telemetry/trend buffer up to 120 samples. Server-side buffers reset when the process restarts. Direct Web Serial samples are also saved in the browser's local storage, up to 120 samples, and can be exported as CSV. The UI polls `GET /api/status` once per second. The bench simulation controls were removed from the website; `POST /api/simulate` remains available for software-only validation.
 
 ## REST API
 

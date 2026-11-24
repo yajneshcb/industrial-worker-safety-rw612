@@ -11,7 +11,7 @@ The synopsis defines a locally autonomous FRDM-RW612 safety node: onboard P3T175
 | Dashboard UI and HTTP API | `dashboard/` Flask app; 1-second status polling; bounded history and event log | Present; process memory is not shared across Vercel instances |
 | USB telemetry path | Firmware prints `[TELEMETRY]` JSON; `serial_bridge.py` POSTs to dashboard | Implemented; transient local POST failures now retry |
 | Temperature and motion | P3T1755 I2C at `0x48`; MPU-6050 I2C at `0x68` | Firmware drivers exist; physical operation still requires bench validation |
-| Gas sensing | GAU ADC path on J7 pin 3 with 36 kΩ / 10 kΩ divider | Driver exists, but the published value is an uncalibrated relative index, not PPM |
+| Gas sensing | GAU ADC path on J7 pin 3/GPIO46 with 36 kΩ / 10 kΩ divider | Driver and explicit GPIO46 pad mux exist; the published value is an uncalibrated relative index, not PPM |
 | Local alarms and SOS | GPIO outputs and SW2 handling | Firmware exists; confirm board routing and GPIO electrical limits at bench |
 | Wireless telemetry | `WIFI_STACK_AVAILABLE` defaults to `0`; manager is a placeholder | Not implemented. Current working data transport is USB VCOM through the host bridge |
 | Firmware build | CMake SDK project and prior `.bin` artifact | Cannot reproduce here: configured Arm GCC path is absent; no board-in-loop test available |

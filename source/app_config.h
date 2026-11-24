@@ -58,7 +58,7 @@ void BOARD_InitHardware(void);
 #define BOARD_MPU6050_I2C_ADDR        0x68U                    /* MPU-6050, AD0 pulled to GND */
 
 /* ---- MQ-2 Toxic Gas & Smoke Sensor on GAU GPADC0 ----
- * SDK ADC example: GAU_GPADC0, channel kADC_CH4 = GPIO_46 = Header J7 Pin 3.
+ * NXP FRDM-RW612 ADC example: GAU_GPADC0, channel kADC_CH4 = GPIO_46 = Header J7 Pin 3.
  * ADC input voltage range is 0 - 1.2 V with a ~0.2 V minimum operating point.
  * Voltage divider: 36 kΩ top (AOUT side) + 10 kΩ bottom (GND side)
  * Divider ratio: 10 / (36 + 10) = 0.2174. At AOUT = 5.0 V, Vpin = 1.087 V (< 1.2 V).

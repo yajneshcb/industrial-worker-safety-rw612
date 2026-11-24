@@ -262,11 +262,11 @@
             <div class="gas-readout">
               <div class="big-value">
                 <span id="gasValue">—</span>
-                <small>PPM</small>
+                <small>INDEX</small>
               </div>
               <span class="aqi-label" id="gasQuality">OFFLINE</span>
             </div>
-            <div class="gas-meter" role="img" aria-label="Gas concentration meter with warning at 300 PPM and critical at 600 PPM">
+            <div class="gas-meter" role="img" aria-label="Relative MQ-2 output index with demonstration warning at 300 and critical at 600">
               <div class="gas-zones"><i></i><i></i><i></i></div>
               <div class="gas-track">
                 <span class="gas-marker warning-marker"><b>300</b></span>
@@ -288,7 +288,7 @@
             <div class="sparkline-box gas-spark">
               <div class="sparkline-head">
                 <span>GAS TREND</span>
-                <span>THRESHOLD <b>300 PPM</b></span>
+                <span>DEMO LIMIT <b>300 INDEX</b></span>
               </div>
               <svg class="sparkline" id="gasSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent gas concentration trend"></svg>
             </div>
@@ -473,7 +473,7 @@
             <button class="sim-btn sim-normal" data-action="normal" type="button" title="Baseline safe telemetry">
               <span class="sim-btn-icon">✓</span>
               <span class="sim-btn-title">NORMAL SAFE</span>
-              <small>26.5°C · 45 PPM · 1.0g</small>
+              <small>26.5°C · 45 INDEX · 1.0g</small>
             </button>
             <button class="sim-btn sim-sos" data-action="sos" type="button" title="Manual SOS button press">
               <span class="sim-btn-icon">⚠</span>
@@ -493,7 +493,7 @@
             <button class="sim-btn sim-gas" data-action="gas_leak" type="button" title="Toxic/flammable gas threshold">
               <span class="sim-btn-icon">☁</span>
               <span class="sim-btn-title">GAS LEAK</span>
-              <small>720 PPM critical hazard</small>
+              <small>720 INDEX high output</small>
             </button>
             <button class="sim-btn sim-fault" data-action="sensor_fault" type="button" title="Simulate sensor fault">
               <span class="sim-btn-icon">⚡</span>

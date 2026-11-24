@@ -50,7 +50,7 @@ Motion / Fall   Hazard           (SOS)
 2. **Edge Decision Stage:**
    - Onboard thresholds evaluation:
      - Free-fall signature + impact spike = Fall Detected.
-     - Gas PPM > Warning / Emergency thresholds = Gas Hazard.
+     - MQ-2 relative output index above demonstration thresholds = Gas Hazard (not calibrated PPM).
      - Temperature > Critical threshold = Heat Hazard.
      - SW2 trigger = Immediate Manual SOS.
    - Health check: Detect sensor disconnect/fault.

@@ -621,7 +621,9 @@ def post_telemetry():
     if payload.get("has_telemetry") is False or str(payload.get("link_state", "")).strip().lower() == "disconnected":
         return jsonify({"ok": True, "data": store.reset_to_disconnected()})
     try:
-        return jsonify({"ok": True, "data": store.ingest(payload, "wifi")})
+        link_source = str(payload.get("link_source", "")).lower()
+        ingest_source = "serial" if "serial" in link_source or "vcom" in link_source else "wifi"
+        return jsonify({"ok": True, "data": store.ingest(payload, ingest_source)})
     except (ValueError, TypeError) as exc:
         return jsonify({"error": str(exc)}), 400
 

@@ -28,7 +28,7 @@ The Flask development server used by `python dashboard_app.py` is intended for l
 
 ## Dashboard contents
 
-The interface shows the NORMAL / WARNING / EMERGENCY state, live clock and connection health; temperature with 40 °C and 50 °C markers and min/max readings; motion magnitude, tri-axial vectors and fall counter; gas concentration with 300 / 600 PPM zones; a visual twin for green/yellow/red outputs and the buzzer; a timestamped/filterable incident log with CSV and JSON exports; and six bench simulation actions.
+The interface shows the NORMAL / WARNING / EMERGENCY state, live clock and connection health; temperature with 40 °C and 50 °C markers and min/max readings; motion magnitude, tri-axial vectors and fall counter; the MQ-2 relative output index with demonstration limits at 300 / 600; a visual twin for green/yellow/red outputs and the buzzer; a timestamped/filterable incident log with CSV and JSON exports; and six bench simulation actions. The API retains the legacy `gas_ppm` field name for compatibility, but this firmware's uncalibrated MQ-2 value is not PPM.
 
 The in-memory event log retains up to 500 events and the trend buffer up to 120 samples. Both reset when the process restarts. The UI polls `GET /api/status` once per second.
 
@@ -60,7 +60,7 @@ curl -X POST http://127.0.0.1:3000/api/simulate \
   -d '{"action":"fall"}'
 ```
 
-Actions: `sos`, `fall`, `high_temp`, `gas_leak`, `sensor_fault`, and `normal`. The interface exposes the same controls. `fall` injects a free-fall sample and then a 2.85 g impact. `high_temp` sets 48.5 °C (warning); `gas_leak` sets 550 PPM (warning); `normal` restores the safe baseline and clears the fall latch.
+Actions: `sos`, `fall`, `high_temp`, `gas_leak`, `sensor_fault`, and `normal`. The interface exposes the same controls. `fall` injects a free-fall sample and then a 2.85 g impact. `high_temp` sets 48.5 °C (warning); `gas_leak` sets a 550 demonstration index value (warning); `normal` restores the safe baseline and clears the fall latch.
 
 ## Optional USB Serial VCOM ingestion
 
@@ -75,7 +75,7 @@ Linux hosts may need suitable `/dev/ttyACM*` or `/dev/ttyUSB*` permissions; Wind
 ## Thresholds and limitations
 
 - Temperature: advisory warning at **≥40.0 °C**, emergency at **≥50.0 °C**.
-- Gas/smoke: advisory warning at **≥300 PPM**, emergency at **≥600 PPM**.
+- Gas/smoke: demonstration relative-index warning at **≥300**, emergency at **≥600**. The current firmware has no MQ-2 R0 calibration and does not report concentration in PPM.
 - Fall: free-fall **<0.4 g**, then impact **>2.5 g** within **1.0 second**; emergency latch **5 seconds**.
 - Manual SOS: highest-priority emergency override.
 - Normal actuator mirror: green solid, yellow/red off, buzzer off. Environmental warning: yellow solid and periodic warning beep. Sensor fault: yellow 1 Hz pulse. Emergency: red 100 ms strobe and continuous rapid alarm.

@@ -38,7 +38,23 @@ LINK_TIMEOUT_S = 5.0        # No telemetry for 5.0s -> signal OFFLINE to dashboa
 NO_DATA_HINT_S = 8.0        # No bytes for 8s -> print wiring & firmware diagnostic hint
 
 _last_error: dict[str, str] = {}
-_dispatch_queue: queue.Queue[dict[str, Any] | None] = queue.Queue(maxsize=100)
+_dispatch_queue: queue.Queue[dict[str, Any] | None] = queue.Queue(maxsize=1)
+
+
+def enqueue_latest(payload: dict[str, Any]) -> None:
+    """Keep the newest state while the dashboard endpoint is unavailable."""
+    try:
+        _dispatch_queue.put_nowait(payload)
+    except queue.Full:
+        try:
+            _dispatch_queue.get_nowait()
+            _dispatch_queue.task_done()
+        except queue.Empty:
+            pass
+        try:
+            _dispatch_queue.put_nowait(payload)
+        except queue.Full:
+            pass
 
 
 def ts() -> str:
@@ -102,16 +118,22 @@ def _post_http(url: str, payload: dict[str, Any], secret: str = "") -> bool:
 
 
 def _http_dispatcher_worker(cloud_url: str, local_url: str, secret: str):
-    """Background worker thread so HTTP latency does not block serial reading."""
+    """Post telemetry off the serial thread and retry transient endpoint failures."""
     while True:
         item = _dispatch_queue.get()
         if item is None:
             break
         try:
+            # The local dashboard is the user's live monitor, so deliver there first.
+            # Retain a failed local item and retry with backoff instead of silently dropping it.
+            if local_url:
+                delay = 0.5
+                while not _post_http(local_url, item, secret):
+                    time.sleep(delay)
+                    delay = min(delay * 2.0, 8.0)
+            # Cloud mirroring is best effort; it must never stall local dashboard updates.
             if cloud_url:
                 _post_http(cloud_url, item, secret)
-            if local_url:
-                _post_http(local_url, item, secret)
         except Exception as exc:
             print(f"  [{ts()}] [DISPATCH ERROR] {exc}")
         finally:
@@ -158,10 +180,7 @@ def handle_line(line: str, link_source: str, state: dict[str, Any], raw_mode: bo
             print(f"  [{ts()}] [CSV ERROR] Failed to write log: {exc}")
 
     # Enqueue asynchronously for HTTP transmission
-    try:
-        _dispatch_queue.put_nowait(payload)
-    except queue.Full:
-        pass  # Prevent queue buildup if endpoints are completely unresponsive
+    enqueue_latest(payload)
 
     temp = payload.get("temp", payload.get("temperature_c", "—"))
     accel = payload.get("accel", payload.get("accel_magnitude_g", "—"))
@@ -208,16 +227,10 @@ def stream_serial(target_port: str, baud_rate: int, raw_mode: bool, csv_path: st
                     # Check link timeout regardless of whether non-telemetry bytes were received
                     if state["count"] > 0 and (now - last_packet > LINK_TIMEOUT_S) and not offline_sent:
                         print(f"  [{ts()}] [LINK] Telemetry stream stopped (>5.0s) — signalling OFFLINE")
-                        try:
-                            _dispatch_queue.put_nowait(disconnect_payload())
-                        except queue.Full:
-                            pass
+                        enqueue_latest(disconnect_payload())
                         offline_sent = True
         except Exception as exc:
-            try:
-                _dispatch_queue.put_nowait(disconnect_payload())
-            except queue.Full:
-                pass
+            enqueue_latest(disconnect_payload())
             print(f"\n[!] Serial connection to {target_port} lost: {exc}")
             print("[*] Reconnecting in 3 seconds...")
             time.sleep(3)
@@ -259,10 +272,7 @@ def stream_rtt(rtt_exe: str, raw_mode: bool, csv_path: str | None = None):
                     continue
                 time.sleep(0.05)
     finally:
-        try:
-            _dispatch_queue.put_nowait(disconnect_payload())
-        except queue.Full:
-            pass
+        enqueue_latest(disconnect_payload())
         if proc.poll() is None:
             proc.terminate()
 

@@ -8,15 +8,12 @@
 
 ## 1. Hardware Pinout & Wiring Checklist
 
-Before powering up the board, cross-check the physical wiring against the following verified pin mappings:
+Use the complete, labeled wire schedule in [pinout_mapping.md](pinout_mapping.md) for every connection. It follows the attached FRDM-RW612 Quick Start Guide and includes board header pins, GPIO names, suggested wire labels/colors, power rails, and the MQ-2 divider.
 
-| Subsystem / Sensor | Board Pin / Header | Signal / Mode | Electrical & Circuit Protection |
-|---|---|---|---|
-| **Digital Temperature (P3T1755)** | Onboard | Flexcomm 2 I2C (`0x48`) | SDA: `GPIO_16`, SCL: `GPIO_17` (Onboard pull-ups) |
-| **Motion & Fall (MPU-6050)** | J5 Pin 9 (SDA), J5 Pin 10 (SCL) | Flexcomm 2 I2C (`0x68`) | Powered from 3.3V (J4 Pin 4) & GND (J4 Pin 7) |
-| **Toxic Gas & Smoke (MQ-2)** | **J7 Pin 3 (GPIO_46)** | **GAU GPADC0 Channel CH4** | **CRITICAL: Resistor divider required!** (See Section 2) |
-| **Emergency SOS Button (SW2)** | **Onboard SW2 (GPIO_11)** | Digital Input, Port 0 Pin 11 | Active LOW, falling-edge interrupt (`GPIO_INTA_IRQn`) |
-| **Active Buzzer Actuator** | Header D4 (`GPIO_4`) | Digital Output, Port 0 Pin 4 | Active HIGH 3.3V trigger |
+Firmware compilation and flashing are performed with the **MCUXpresso extension for VS Code**. Connect the FRDM-RW612 to the host at MCU-Link USB J10, build the project from the extension's project/Quickstart view, then use its debug/download action to program the board. For boot logs, open the extension's Serial Monitor on the MCU-Link VCOM port at 115200 baud. See [BUILD.md](BUILD.md) and [NXP's VS Code getting-started guide](https://www.nxp.com/document/guide/getting-started-with-frdm-rw612:GS-FRDM-RW612).
+
+The table below summarizes principal sensor connections:
+
 | **Component** | **FRDM-RW612 Header Pin** | **Official Header Label** | **Signal / GPIO** | **Notes** |
 |---|---|---|---|---|
 | **MPU-6050: VCC** | **Header J3 Pin 4** | `ARD 3V3` | `3V3` | 3.3V power |
@@ -31,7 +28,7 @@ Before powering up the board, cross-check the physical wiring against the follow
 | **Status LED: Normal (Green)** | **Header J1 Pin 7** | `GPIO5 (MCLK)` | `GPIO_5` | Active HIGH via 220 Ω resistor |
 | **Status LED: Warning (Yellow)**| **Header J2 Pin 6** | `GPIO6 (ARD_D10)` | `GPIO_6` | Active HIGH via 220 Ω resistor |
 | **Status LED: Emergency (Red)** | **Header J2 Pin 12** | `GPIO7 (ARD_D13)` | `GPIO_7` | Active HIGH via 220 Ω resistor |
-| **MCU-Link Debug Console** | Onboard USB J10 | Flexcomm 3 USART | `GPIO_24` (RX) / `GPIO_26` (TX) | 115200 baud, 8-N-1 |
+| **MCU-Link Debug Console** | Onboard USB J10 | Flexcomm 3 USART | Board routed VCOM | 115200 baud, 8-N-1 |
 
 ---
 
@@ -55,6 +52,8 @@ In `source/app_config.h`, the driver converts the measured pin voltage back thro
 $$V_{AOUT} = \frac{V_{pin}}{\text{Ratio}}$$
 
 ---
+
+**Gas unit limitation:** the current firmware does not produce calibrated gas PPM. `MQ2_R0_OHMS` is zero, so the published `gas` value is a relative 0–1000 voltage index. The 300/600 warning limits are demonstration index limits only. Calibrate against a known gas concentration before assigning PPM units or using readings for exposure decisions.
 
 ## 3. Power-On & Boot Diagnostics Sequence
 
@@ -85,7 +84,7 @@ Worker Safety: Temp (P3T1755) + Motion (MPU) + Gas (MQ-2)
 ## 4. End-to-End System Testing
 
 ### Option A: Direct Browser Connection via Web Serial (Zero Backend Setup)
-1. Open the dashboard in **Google Chrome** or **Microsoft Edge** (`http://localhost:5000` or deployed Vercel URL).
+1. Open the dashboard in **Google Chrome** or **Microsoft Edge** (`http://localhost:5000`).
 2. Click the **USB DIRECT** button in the top navigation bar.
 3. Select your **MCU-Link VCOM** serial port in the browser prompt and click **Connect**.
 4. Live telemetry will immediately stream at 115200 baud with real-time gauges, 3-axis motion bars, and hazard classifications.
@@ -95,18 +94,18 @@ Worker Safety: Temp (P3T1755) + Motion (MPU) + Gas (MQ-2)
 ```powershell
 python serial_bridge.py --baud 115200 --port COM3 --csv telemetry_log.csv --raw
 ```
-2. The bridge detects the MCU-Link COM port, parses `[TELEMETRY]` JSON lines, and dispatches them asynchronously via HTTP POST to the local dashboard.
+2. The bridge detects the MCU-Link COM port, parses `[TELEMETRY]` JSON lines, and dispatches them asynchronously to the local dashboard. Transient local HTTP failures are retried; optional cloud mirroring is best effort.
 
 ### Step 2: Mission Control Dashboard
 In a separate terminal, launch the local dashboard:
 ```powershell
 python dashboard/dashboard_app.py
 ```
-Open `http://localhost:5000` in your web browser. You should observe live temperature, total acceleration, individual accelerometer axes (X, Y, Z), gas concentration (PPM), and real-time safety status.
+Open `http://localhost:5000` in your web browser. You should observe live temperature, total acceleration, individual accelerometer axes (X, Y, Z), the MQ-2 relative output index, and real-time safety status.
 
 ### Step 3: Triggering Safety States
 - **Normal State:** Green LED ON, buzzer silent.
 - **High Temperature Warning:** Warm the P3T1755 above 40°C -> Yellow LED ON, periodic buzzer chirp.
-- **Gas Emergency:** Expose MQ-2 to butane/smoke (>600 PPM) -> Red LED ON, rapid buzzer alarm, dashboard emergency alert.
+- **Gas-index demonstration:** Use a safe, controlled test source and monitor the relative MQ-2 output index. Do not treat the 600 threshold as PPM or a certified alarm level.
 - **Fall Detection:** Rapidly drop and catch the board (free-fall <0.4g followed by impact >2.5g) -> Emergency state latched, fall counter incremented.
 - **Manual SOS:** Press onboard button SW2 -> Emergency state triggered with 5.0 s latch hold.

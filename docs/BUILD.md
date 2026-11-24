@@ -8,6 +8,10 @@
 
 ## 1. Prerequisites
 
+**Project workflow:** this team uses the **MCUXpresso extension for VS Code** to compile and flash the firmware. Use the extension's project/Quickstart view to build the `FRDM_RW612_WorkerSafety` project, then start its debug/download action with the board connected to MCU-Link USB J10. Use the extension Serial Monitor on the MCU-Link VCOM port at 115200 baud. The command-line CMake instructions below are a fallback for maintainers and diagnostics; they are not the team's normal compile/flash workflow. For the extension workflow, follow [NXP's FRDM-RW612 getting-started guide](https://www.nxp.com/document/guide/getting-started-with-frdm-rw612:GS-FRDM-RW612).
+
+The developer machine still needs the RW612 MCUXpresso SDK, Arm GNU toolchain, and compatible debug/download tools installed and selected by the extension. Dashboard-only Python validation does not require these embedded packages.
+
 To build this project for the FRDM-RW612 microcontroller, you need:
 
 1. **NXP MCUXpresso SDK for RW612** (SDK version 2.14+ / MCUX SDK repository):

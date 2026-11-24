@@ -291,7 +291,7 @@
     const gas = Number(data.gas_ppm || 0);
     $('#gasValue').textContent = fmt(gas, gas % 1 ? 1 : 0);
     const quality = $('#gasQuality');
-    quality.textContent = gas >= 600 ? 'DANGER ZONE' : gas >= 300 ? 'ELEVATED' : 'CLEAN AIR';
+    quality.textContent = gas >= 600 ? 'HIGH INDEX' : gas >= 300 ? 'ELEVATED INDEX' : 'BASELINE';
     quality.className = `aqi-label ${gas >= 600 ? 'danger' : gas >= 300 ? 'warning' : 'clean'}`;
     const needle = $('#gasNeedle');
     needle.style.left = `${Math.min(100, Math.max(0, gas / 800 * 100))}%`;

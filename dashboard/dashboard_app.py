@@ -817,10 +817,14 @@ def serial_reader() -> None:
                 with store.lock:
                     store.serial_state = "Connected"
                 LOG.info("Reading telemetry from MCU-Link VCOM %s", match.device)
+                last_rx = time.monotonic()
                 while True:
                     line = connection.readline().decode("utf-8", errors="replace").strip()
                     if not line:
+                        if time.monotonic() - last_rx > 5.0:
+                            raise TimeoutError(f"No serial data on {match.device} for >5s; reopening")
                         continue
+                    last_rx = time.monotonic()
                     if ">> WIFI:" in line:
                         LOG.warning("RW612 %s", line.split(">> WIFI:", 1)[1].strip())
                         continue

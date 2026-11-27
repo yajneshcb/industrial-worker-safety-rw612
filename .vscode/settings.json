@@ -11,8 +11,5 @@
   "cmake.buildTask": true,
   "cmake.skipConfigureIfCachePresent": true,
   "cmake.sourceDirectory": "${workspaceFolder}",
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}",
-    "${workspaceFolder}/dashboard"
-  ]
+  "task.allowAutomaticTasks": "on"
 }

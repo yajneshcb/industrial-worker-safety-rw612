@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const $ = (selector) => document.querySelector(selector);
+  const TELEMETRY_STALE_MS = 10000;
   const fmt = (value, digits = 1) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '—';
   const escapeHTML = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
@@ -16,11 +17,6 @@
     emergencyGain: null,
     toastTimer: null,
     pollTimer: null,
-    serialPort: null,
-    serialReader: null,
-    serialConnected: false,
-    serialApiErrorShown: false,
-    serialHistory: []
   };
 
   const themeColors = {
@@ -138,9 +134,22 @@
   }
 
   function renderStatus(data) {
+    const receivedAtMs = Number(data?.received_at_ms);
+    const sampleAgeMs = Date.now() - receivedAtMs;
+    if (data?.has_telemetry && (!Number.isFinite(receivedAtMs) || sampleAgeMs > TELEMETRY_STALE_MS)) {
+      data = {
+        ...data,
+        has_telemetry: false,
+        link_state: 'Disconnected',
+        safety_state: 'OFFLINE',
+        hazard_type: 'NONE'
+      };
+    }
     state.data = data;
-    const isConnected = data.link_state === 'Connected';
     const hasTelemetry = Boolean(data.has_telemetry && data.temperature_c !== null);
+    // A fresh accepted sensor packet proves the data path is alive even if a stale
+    // transport hint in the payload still says "reconnecting".
+    const isConnected = hasTelemetry || data.link_state === 'Connected';
     const isActive = Boolean(isConnected && hasTelemetry);
 
     const badge = $('#connectionBadge');
@@ -153,8 +162,12 @@
     // ==========================================
     if (!isActive) {
       // Top connection badge
-      badge.dataset.link = 'Disconnected';
-      $('#connectionText').textContent = 'DISCONNECTED';
+      const serialState = String(data.serial_status || '').toLowerCase();
+      const connecting = ['Connecting', 'Reconnecting'].includes(data.link_state)
+        || serialState.includes('scanning') || serialState.includes('reconnecting');
+      const pendingLink = connecting ? 'Connecting' : 'Disconnected';
+      badge.dataset.link = pendingLink;
+      $('#connectionText').textContent = pendingLink.toUpperCase();
 
       // Master status banner
       banner.className = 'master-banner state-offline';
@@ -167,7 +180,7 @@
       $('#temperatureValue').textContent = '—';
       $('#temperatureGaugeValue').textContent = '—';
       $('#temperatureArc').style.strokeDasharray = '0 383';
-      $('#temperatureArc').className = 'gauge-value';
+      $('#temperatureArc').setAttribute('class', 'gauge-value');
       $('#temperatureState').textContent = 'NO SIGNAL';
       $('#temperatureState').className = 'mini-state';
       $('#temperatureMin').textContent = '—';
@@ -197,6 +210,7 @@
       gasNeedle.className = 'gas-needle';
       gasNeedle.style.left = '0%';
       $('#gasSensorLive').className = 'sensor-live';
+      $('#gasDiagnostic').textContent = 'ADC raw — · pin — V';
       drawEmptySparkline($('#gasSpark'), 'Awaiting MQ-2 sensor link…');
 
       // Section 01: Actuator Hardware Twin
@@ -214,16 +228,16 @@
       renderTelemetryHistory(data.history || []);
 
       // Section 03: Node Link Diagnostics
-      $('#nodeIndicator').className = 'node-indicator';
-      $('#nodeIndicatorText').textContent = 'OFFLINE';
-      $('#linkStateValue').textContent = 'DISCONNECTED';
+      $('#nodeIndicator').className = `node-indicator ${connecting ? 'connecting' : ''}`;
+      $('#nodeIndicatorText').textContent = pendingLink.toUpperCase();
+      $('#linkStateValue').textContent = pendingLink.toUpperCase();
       $('#linkSourceValue').textContent = '—';
       $('#nodePacketCount').textContent = '0';
       $('#messageIdValue').textContent = '—';
       $('#queueValue').innerHTML = '0 <small>PACKETS</small>';
       $('#queueBar').style.width = '0%';
       $('#serialStatusValue').textContent = (data.serial_status || 'Disabled').toUpperCase();
-      $('#nodeFootnote').textContent = 'Node disconnected. Awaiting telemetry stream from NXP FRDM-RW612.';
+      $('#nodeFootnote').textContent = connecting ? 'Opening the node telemetry link and waiting for its first sensor packet.' : 'Node disconnected. Awaiting telemetry stream from NXP FRDM-RW612.';
       $('#packetCount').textContent = '—';
       $('#sampleAge').textContent = '—';
 
@@ -241,10 +255,12 @@
     const hazard = String(data.hazard_type || 'NONE');
 
     // Connection badge
-    const link = ['Connected', 'Reconnecting', 'Disconnected', 'Buffered'].includes(data.link_state) ? data.link_state : 'Connected';
+    const link = data.has_telemetry ? 'Connected' : (data.link_state === 'Reconnecting' ? 'Connecting' : ['Connected', 'Connecting', 'Disconnected', 'Buffered'].includes(data.link_state) ? data.link_state : 'Disconnected');
     const badgeLink = data.buffered || Number(data.offline_queue_count || 0) > 0 ? 'Buffered' : link;
     badge.dataset.link = badgeLink;
-    $('#connectionText').textContent = badgeLink === 'Connected' ? 'LIVE · CONNECTED' : badgeLink === 'Buffered' ? 'BUFFERED' : badgeLink.toUpperCase();
+    const sourceLabel = String(data.link_source || '').toLowerCase();
+    const liveLabel = (sourceLabel.includes('wi-fi') || sourceLabel.includes('wifi')) ? 'LIVE: WIFI' : sourceLabel.includes('usb') ? 'LIVE: USB' : 'LIVE · CONNECTED';
+    $('#connectionText').textContent = badgeLink === 'Connected' ? liveLabel : badgeLink === 'Buffered' ? 'BUFFERED' : badgeLink.toUpperCase();
 
     // Banner
     banner.className = `master-banner state-${safety.toLowerCase()}`;
@@ -268,7 +284,7 @@
     const arc = $('#temperatureArc');
     const gaugeLength = circumference * 0.75;
     arc.style.strokeDasharray = `${(gaugeLength * tempPercent / 100).toFixed(1)} ${circumference.toFixed(1)}`;
-    arc.className = `gauge-value${temp >= 50 ? ' emergency' : temp >= 40 ? ' warning' : ''}`;
+    arc.setAttribute('class', `gauge-value${temp >= 50 ? ' emergency' : temp >= 40 ? ' warning' : ''}`);
     const tempCondition = temp >= 50 ? 'emergency' : temp >= 40 ? 'warning' : 'normal';
     $('#temperatureState').textContent = temp >= 50 ? 'CRITICAL' : temp >= 40 ? 'WARNING' : 'NORMAL';
     $('#temperatureState').className = `mini-state ${tempCondition}`;
@@ -277,29 +293,38 @@
 
     // Card 2: Motion
     const accel = Number(data.accel_magnitude_g);
-    $('#accelValue').textContent = fmt(accel, 2);
-    $('#axisX').textContent = signed(data.accel_x);
-    $('#axisY').textContent = signed(data.accel_y);
-    $('#axisZ').textContent = signed(data.accel_z);
-    setAxisBar('#axisBarX', data.accel_x);
-    setAxisBar('#axisBarY', data.accel_y);
-    setAxisBar('#axisBarZ', data.accel_z);
+    const mpuFault = data.mpu_ok === false;
+    $('#accelValue').textContent = mpuFault ? '—' : fmt(accel, 2);
+    $('#axisX').textContent = mpuFault ? '—' : signed(data.accel_x);
+    $('#axisY').textContent = mpuFault ? '—' : signed(data.accel_y);
+    $('#axisZ').textContent = mpuFault ? '—' : signed(data.accel_z);
+    setAxisBar('#axisBarX', mpuFault ? null : data.accel_x);
+    setAxisBar('#axisBarY', mpuFault ? null : data.accel_y);
+    setAxisBar('#axisBarZ', mpuFault ? null : data.accel_z);
     $('#fallCount').textContent = data.fall_event_count ?? 0;
     const motionCondition = $('#motionCondition');
-    const impact = accel > 2.5 || hazard === 'FALL_DETECTED';
-    motionCondition.className = `motion-condition ${impact ? 'impact' : 'stable'}`;
-    motionCondition.lastElementChild.textContent = impact ? 'IMPACT EVENT' : 'STABLE';
+    const impact = !mpuFault && (accel > 2.5 || hazard === 'FALL_DETECTED');
+    motionCondition.className = `motion-condition ${mpuFault ? 'impact' : impact ? 'impact' : 'stable'}`;
+    motionCondition.lastElementChild.textContent = mpuFault ? 'I2C FAULT (0x68)' : (impact ? 'IMPACT EVENT' : 'STABLE');
 
     // Card 3: Gas
     const gas = Number(data.gas_ppm || 0);
-    $('#gasValue').textContent = fmt(gas, gas % 1 ? 1 : 0);
+    const gasFault = data.gas_ok === false;
+    $('#gasValue').textContent = gasFault ? '—' : fmt(gas, gas % 1 ? 1 : 0);
     const quality = $('#gasQuality');
-    quality.textContent = gas >= 600 ? 'HIGH INDEX' : gas >= 300 ? 'ELEVATED INDEX' : 'BASELINE';
-    quality.className = `aqi-label ${gas >= 600 ? 'danger' : gas >= 300 ? 'warning' : 'clean'}`;
+    quality.textContent = gasFault ? 'ADC FAULT' : (gas >= 850 ? 'HIGH INDEX' : gas >= 700 ? 'ELEVATED INDEX' : 'BASELINE');
+    quality.className = `aqi-label ${gasFault ? 'danger' : gas >= 850 ? 'danger' : gas >= 700 ? 'warning' : 'clean'}`;
     const needle = $('#gasNeedle');
-    needle.style.left = `${Math.min(100, Math.max(0, gas / 800 * 100))}%`;
-    needle.className = `gas-needle active ${gas >= 600 ? 'danger' : gas >= 300 ? 'warning' : ''}`;
-    $('#gasSensorLive').className = 'sensor-live active';
+    needle.style.left = `${gasFault ? 0 : Math.min(100, Math.max(0, gas / 1000 * 100))}%`;
+    needle.className = `gas-needle ${gasFault ? '' : 'active'} ${!gasFault && gas >= 850 ? 'danger' : !gasFault && gas >= 700 ? 'warning' : ''}`;
+    $('#gasSensorLive').className = `sensor-live ${gasFault ? '' : 'active'}`;
+    const gasRaw = data.gas_raw;
+    const gasAdcV = data.gas_adc_v;
+    $('#gasDiagnostic').textContent = gasFault
+      ? 'ADC fault — check J7-3 (GPIO46) & MQ-2 power'
+      : (gasRaw == null || gasAdcV == null
+        ? 'ADC raw — · pin — V'
+        : `ADC raw ${fmt(gasRaw, 0)} · pin ${fmt(gasAdcV, 3)} V`);
 
     // Card 4: Actuator Mirror
     renderActuators(data);
@@ -313,7 +338,7 @@
     const samples = (data.history || []).filter((item) => item.temperature_c !== null);
     if (samples.length) {
       drawSparkline($('#temperatureSpark'), samples.map((item) => item.temperature_c), c.temperature, 40, c.pointStroke);
-      drawSparkline($('#gasSpark'), samples.map((item) => item.gas_ppm), c.gas, 300, c.pointStroke);
+      drawSparkline($('#gasSpark'), samples.map((item) => item.gas_ppm), c.gas, 700, c.pointStroke);
       drawSparkline($('#motionSpark'), samples.map((item) => item.accel_magnitude_g), c.motion, 2.5, c.pointStroke);
     } else {
       drawEmptySparkline($('#temperatureSpark'), 'Awaiting P3T1755 samples…');
@@ -360,7 +385,7 @@
   }
 
   function renderLink(data) {
-    const link = ['Connected', 'Reconnecting', 'Disconnected', 'Buffered'].includes(data.link_state) ? data.link_state : 'Disconnected';
+    const link = data.has_telemetry ? 'Connected' : (data.link_state === 'Reconnecting' ? 'Connecting' : ['Connected', 'Connecting', 'Disconnected', 'Buffered'].includes(data.link_state) ? data.link_state : 'Disconnected');
     const node = $('#nodeIndicator');
     node.className = `node-indicator ${link.toLowerCase()}`;
     $('#nodeIndicatorText').textContent = link.toUpperCase();
@@ -373,7 +398,7 @@
     $('#queueValue').innerHTML = `${queued} <small>PACKETS</small>`;
     $('#queueBar').style.width = `${Math.min(100, queued / 1000 * 100)}%`;
     $('#serialStatusValue').textContent = (data.serial_status || 'Disabled').toUpperCase();
-    $('#nodeFootnote').textContent = link === 'Connected' ? `Telemetry source ${data.link_source || 'unknown'} · latest message ID: ${data.id ?? 'pending'}.` : link === 'Reconnecting' ? 'Wireless link interrupted — buffered packets may be queued on the edge node.' : link === 'Buffered' ? `${queued} packet(s) buffered locally while the wireless link is unavailable.` : 'Awaiting node telemetry packet.';
+    $('#nodeFootnote').textContent = link === 'Connected' ? `Telemetry source ${data.link_source || 'unknown'} · latest message ID: ${data.id ?? 'pending'}.` : link === 'Connecting' ? 'Opening the telemetry link and waiting for a fresh node packet.' : link === 'Buffered' ? `${queued} packet(s) buffered locally while the wireless link is unavailable.` : 'Awaiting node telemetry packet.';
   }
 
   function renderIncidents(incidents) {
@@ -396,7 +421,7 @@
   function renderTelemetryHistory(history) {
     const rows = $('#telemetryLogRows');
     if (!rows) return;
-    const allSamples = mergeTelemetryHistory(history, state.serialHistory);
+    const allSamples = Array.isArray(history) ? history.slice(-120) : [];
     const recent = [...allSamples].reverse().slice(0, 20);
     $('#telemetryLogCount').textContent = allSamples.length;
     if (!recent.length) {
@@ -412,36 +437,28 @@
     }).join('');
   }
 
-  function mergeTelemetryHistory(serverSamples, browserSamples) {
-    const unique = new Map();
-    [...serverSamples, ...browserSamples].forEach((sample) => {
-      const key = `${sample.received_at_ms ?? sample.timestamp_ms ?? ''}:${sample.id ?? ''}`;
-      unique.set(key, sample);
-    });
-    return [...unique.values()]
-      .sort((a, b) => Number(a.received_at_ms || a.timestamp_ms || 0) - Number(b.received_at_ms || b.timestamp_ms || 0))
-      .slice(-120);
-  }
-
-  function persistWebSerialSample(sample) {
-    state.serialHistory = mergeTelemetryHistory(state.serialHistory, [sample]);
-    try {
-      localStorage.setItem('rw612-web-serial-history', JSON.stringify(state.serialHistory));
-    } catch (error) {
-      console.warn('Could not persist Web Serial history in this browser:', error);
-    }
-  }
-
   async function fetchStatus() {
     try {
       const response = await fetch('/api/status', { cache: 'no-store', headers: { 'Accept': 'application/json' } });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       renderStatus(await response.json());
     } catch (error) {
-      $('#connectionBadge').dataset.link = 'Reconnecting';
-      $('#connectionText').textContent = 'RECONNECTING';
-      $('#nodeIndicator').className = 'node-indicator reconnecting';
-      $('#nodeIndicatorText').textContent = 'RECONNECTING';
+      const receivedAtMs = Number(state.data?.received_at_ms);
+      const sampleAgeMs = Date.now() - receivedAtMs;
+      if (state.data?.has_telemetry && (!Number.isFinite(receivedAtMs) || sampleAgeMs > TELEMETRY_STALE_MS)) {
+        renderStatus({
+          ...state.data,
+          has_telemetry: false,
+          link_state: 'Disconnected',
+          safety_state: 'OFFLINE',
+          hazard_type: 'NONE'
+        });
+        return;
+      }
+      $('#connectionBadge').dataset.link = 'Connecting';
+      $('#connectionText').textContent = 'CONNECTING';
+      $('#nodeIndicator').className = 'node-indicator connecting';
+      $('#nodeIndicatorText').textContent = 'CONNECTING';
       $('#nodeFootnote').textContent = 'Dashboard API unavailable — retrying connection.';
     }
   }
@@ -470,7 +487,7 @@
   }
 
   function exportTelemetryCSV() {
-    const samples = mergeTelemetryHistory(state.data?.history || [], state.serialHistory);
+    const samples = Array.isArray(state.data?.history) ? state.data.history : [];
     const columns = ['received_at_ms', 'timestamp_ms', 'id', 'temperature_c', 'accel_magnitude_g', 'accel_x', 'accel_y', 'accel_z', 'gas_ppm', 'safety_state', 'hazard_type', 'source'];
     const quote = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
     const csv = [columns.join(','), ...samples.map((sample) => columns.map((key) => quote(sample[key])).join(','))].join('\r\n');
@@ -555,112 +572,12 @@
     } catch (error) { showToast(error.message); }
   }
 
-  async function disconnectWebSerial() {
-    if (state.serialReader) {
-      try {
-        await state.serialReader.cancel();
-      } catch (_) {}
-      state.serialReader = null;
-    }
-    if (state.serialPort) {
-      try {
-        await state.serialPort.close();
-      } catch (_) {}
-      state.serialPort = null;
-    }
-    state.serialConnected = false;
-    const btn = $('#serialConnectBtn');
-    if (btn) {
-      btn.classList.remove('connected');
-      $('#serialBtnText').textContent = 'USB DIRECT';
-    }
-    showToast('USB Serial disconnected.');
-  }
-
-  async function toggleWebSerial() {
-    if (state.serialConnected) {
-      await disconnectWebSerial();
-      return;
-    }
-    if (!('serial' in navigator)) {
-      showToast('Web Serial API requires Chrome, Edge, or Opera over HTTPS / localhost.');
-      return;
-    }
-    try {
-      const port = await navigator.serial.requestPort();
-      await port.open({ baudRate: 115200 });
-      state.serialPort = port;
-      state.serialConnected = true;
-
-      const btn = $('#serialConnectBtn');
-      if (btn) {
-        btn.classList.add('connected');
-        $('#serialBtnText').textContent = 'CONNECTED';
-      }
-      showToast('USB Serial connected @ 115200 baud.');
-
-      const textDecoder = new TextDecoderStream();
-      port.readable.pipeTo(textDecoder.writable).catch(() => {});
-      const reader = textDecoder.readable.getReader();
-      state.serialReader = reader;
-
-      let lineBuf = '';
-      while (state.serialConnected) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        lineBuf += value;
-        const lines = lineBuf.split('\n');
-        lineBuf = lines.pop();
-        for (const raw of lines) {
-          const line = raw.trim();
-          if (!line.includes('[TELEMETRY]')) continue;
-          const jsonText = line.split('[TELEMETRY]')[1].trim();
-          try {
-            const payload = JSON.parse(jsonText);
-            payload.link_state = 'Connected';
-            payload.link_source = 'USB Serial (Web Serial)';
-            payload.has_telemetry = true;
-            const response = await fetch('/api/telemetry', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-            });
-            const result = await response.json();
-            if (!response.ok || !result.ok || !result.data) {
-              throw new Error(result.error || `Dashboard rejected telemetry (HTTP ${response.status})`);
-            }
-            state.serialApiErrorShown = false;
-            const acceptedSample = result.data.history?.[result.data.history.length - 1];
-            if (acceptedSample) persistWebSerialSample(acceptedSample);
-            renderStatus(result.data);
-          } catch (pe) {
-            console.error('Serial telemetry was not recorded:', pe);
-            if (!state.serialApiErrorShown) {
-              showToast(`Telemetry not recorded: ${pe.message}`);
-              state.serialApiErrorShown = true;
-            }
-          }
-        }
-      }
-    } catch (err) {
-      if (err.name !== 'NotFoundError') {
-        showToast(`Serial error: ${err.message}`);
-      }
-      await disconnectWebSerial();
-    }
-  }
-
   function bindEvents() {
     $('#hazardFilter').addEventListener('change', () => renderIncidents(state.incidents));
     $('#exportCsv').addEventListener('click', exportCSV);
     $('#exportJson').addEventListener('click', exportJSON);
     $('#exportTelemetryCsv').addEventListener('click', exportTelemetryCSV);
     $('#audioButton').addEventListener('click', toggleAudio);
-
-    const serialBtn = $('#serialConnectBtn');
-    if (serialBtn) {
-      serialBtn.addEventListener('click', toggleWebSerial);
-    }
 
     const themeBtn = $('#themeToggle');
     if (themeBtn) {
@@ -673,15 +590,12 @@
 
     window.addEventListener('online', fetchStatus);
     window.addEventListener('offline', () => {
-      $('#connectionBadge').dataset.link = 'Reconnecting';
-      $('#connectionText').textContent = 'BROWSER OFFLINE';
+      $('#connectionBadge').dataset.link = 'Connecting';
+      $('#connectionText').textContent = 'CONNECTING';
+      $('#nodeIndicator').className = 'node-indicator connecting';
+      $('#nodeIndicatorText').textContent = 'CONNECTING';
     });
   }
-
-  try {
-    const storedSerialHistory = JSON.parse(localStorage.getItem('rw612-web-serial-history') || '[]');
-    if (Array.isArray(storedSerialHistory)) state.serialHistory = storedSerialHistory.slice(-120);
-  } catch (_) { }
 
   // Initialize theme from storage or preference
   let initialTheme = 'dark';

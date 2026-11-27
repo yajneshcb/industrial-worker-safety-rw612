@@ -20,6 +20,8 @@
 #include "fsl_i2c.h"
 #include "fsl_debug_console.h"
 #include "system_RW612.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 /* Modular subsystem headers */
 #include "sensor_temp.h"
@@ -60,6 +62,7 @@ static void App_ProcessSensors(void);
 static void App_ProcessSafetyLogic(void);
 static void App_ProcessAlerts(void);
 static void App_ProcessCommunication(void);
+static void App_SchedulerTask(void *argument);
 
 static TempSensorData_t   s_currentTemp;
 static Mpu6050Data_t      s_currentMpu;
@@ -78,34 +81,6 @@ __attribute__((unused)) static void App_PrintFloat2Dec(float val)
         centi = -centi;
     }
     PRINTF("%s%d.%02d", sign, (int)(centi / 100), (int)(centi % 100));
-}
-
-/*******************************************************************************
- * High-Precision Fixed-Period Real-Time Scheduler
- * Runs at IMU_POLL_INTERVAL_MS (20 ms / 50 Hz).
- ******************************************************************************/
-static uint32_t s_nextDeadlineMs = 0U;
-
-static void App_CycleDelay(void)
-{
-    if (!Timebase_IsRunning())
-    {
-        SDK_DelayAtLeastUs(IMU_POLL_INTERVAL_MS * 1000U, SystemCoreClock);
-        return;
-    }
-
-    s_nextDeadlineMs += IMU_POLL_INTERVAL_MS;
-
-    if ((int32_t)(Timebase_GetMs() - s_nextDeadlineMs) > 0)
-    {
-        /* Slot overrun: resynchronize */
-        s_nextDeadlineMs = Timebase_GetMs();
-        return;
-    }
-
-    while ((int32_t)(Timebase_GetMs() - s_nextDeadlineMs) < 0)
-    {
-    }
 }
 
 /*******************************************************************************
@@ -155,9 +130,24 @@ int main(void)
     PRINTF("\r\n>> BOARD RUNNING: Multi-Rate Sensor & Safety Scheduler Starting...\r\n");
     PRINTF(">> Fast IMU Sampling: 50 Hz (20 ms) | Main Sensor/Logic: 10 Hz (100 ms)\r\n");
 
-    uint32_t subtickPhase = 0U;
+    if (xTaskCreate(App_SchedulerTask, "safety", 1024U, NULL,
+                    configMAX_PRIORITIES - 2U, NULL) != pdPASS)
+    {
+        PRINTF(">> ERROR: safety task creation failed\r\n");
+        for (;;) {}
+    }
+    vTaskStartScheduler();
+    PRINTF(">> ERROR: scheduler stopped\r\n");
+    for (;;) {}
+}
 
-    while (1)
+static void App_SchedulerTask(void *argument)
+{
+    uint32_t subtickPhase = 0U;
+    TickType_t nextWake = xTaskGetTickCount();
+    (void)argument;
+
+    for (;;)
     {
         /* 1. Fast 50 Hz Stage: Acquire MPU-6050 IMU & Process High-Speed Fall Detection every 20 ms */
         App_ProcessMotionAndFall();
@@ -198,11 +188,8 @@ int main(void)
             subtickPhase = 0U;
         }
 
-        /* 3. Maintain exact 20 ms loop timing */
-        App_CycleDelay();
+        vTaskDelayUntil(&nextWake, pdMS_TO_TICKS(IMU_POLL_INTERVAL_MS));
     }
-
-    return 0; 
 }
 
 /*******************************************************************************
@@ -221,8 +208,6 @@ static void App_InitSystem(void)
     setvbuf(stdout, NULL, _IONBF, 0);
 
     (void)Timebase_Init();
-    s_nextDeadlineMs = Timebase_GetMs();
-
     PRINTF("\r\n==================================================\r\n");
     PRINTF("Worker Safety: Temp (P3T1755) + Motion (MPU) + Gas (MQ-2)\r\n");
     PRINTF("==================================================\r\n");
@@ -305,12 +290,17 @@ static void App_ProcessCommunication(void)
     packet.hazard            = s_lastEvaluation.primary_hazard;
     packet.temperature_c     = g_liveTemperature;
     packet.gas_ppm           = s_currentGas.gas_ppm;
+    packet.gas_raw_adc       = s_currentGas.raw_adc_value;
+    packet.gas_adc_pin_voltage_v = s_currentGas.adc_pin_voltage_v;
     packet.accel_magnitude_g = g_liveAccelTotal;
     packet.accel_x_g         = g_liveAccelX;
     packet.accel_y_g         = g_liveAccelY;
     packet.accel_z_g         = g_liveAccelZ;
     packet.sos_active        = (s_lastEvaluation.primary_hazard == HAZARD_MANUAL_SOS);
-    packet.sensors_ok        = !(SENSOR_Temp_IsFaulted() || SENSOR_MPU6050_IsFaulted() || SENSOR_Gas_IsFaulted());
+    packet.temp_ok           = !SENSOR_Temp_IsFaulted();
+    packet.mpu_ok            = !SENSOR_MPU6050_IsFaulted();
+    packet.gas_ok            = !SENSOR_Gas_IsFaulted();
+    packet.sensors_ok        = (packet.temp_ok && packet.mpu_ok && packet.gas_ok);
 
     /* High-Priority Dispatch: Emergency alerts at EMERGENCY_REPORT_INTERVAL_MS */
     if (s_lastEvaluation.state == SAFETY_STATE_EMERGENCY)

@@ -32,6 +32,15 @@ mcux_add_source(
             source/sensors/sensor_temp.c
             source/wireless/alert_reporter.c
             source/wireless/wifi_manager.c
+            source/wireless/dashboard_transport.c
+            source/wireless/ca_bundle.c
+)
+
+mcux_add_source(
+    BASE_PATH ${SdkRootDirPath}
+    SOURCES examples/wifi_examples/wifi_mqtt/lwippools.h
+            examples/wifi_examples/wifi_mqtt/wifi_config/wifi_config.h
+            examples/_boards/frdmrw612/FreeRTOSConfigBoard.h
 )
 
 mcux_add_include(
@@ -43,10 +52,36 @@ mcux_add_include(
              source/wireless
 )
 
-mcux_add_armgcc_linker_script(
-    TARGETS debug release flash_debug flash_release Debug Release
+mcux_add_include(
     BASE_PATH ${SdkRootDirPath}
+    INCLUDES examples/wifi_examples/wifi_mqtt
+             examples/wifi_examples/wifi_mqtt/wifi_config
+             examples/_boards/frdmrw612/wifi_examples/common
+)
+
+mcux_add_macro(CC "-DUSE_RTOS=1 -D_POSIX_SOURCE -DCONFIG_MONOLITHIC_WIFI=1 -DCONFIG_SOC_SERIES_RW6XX_REVISION_A2=1")
+
+# Wi-Fi occupies additional SRAM on RW612. Use NXP's Wi-Fi memory layout.
+mcux_remove_armgcc_linker_script(
+    BASE_PATH ${SdkRootDirPath}
+    TARGETS debug release flash_debug flash_release Debug Release
     LINKER devices/Wireless/RW/RW612/gcc/RW612_flash.ld
+)
+mcux_add_armgcc_linker_script(
+    BASE_PATH ${SdkRootDirPath}
+    TARGETS debug release flash_debug flash_release Debug Release
+    LINKER examples/_boards/frdmrw612/wifi_examples/common/linker/RW610_flash.ld
+)
+
+# The RW612 device defaults include the RAM linker script. This application is
+# linked for flash execution, so remove the RAM script before adding flash.
+mcux_remove_armgcc_linker_script(
+    BASE_PATH ${SdkRootDirPath}
+    TARGETS debug release flash_debug flash_release Debug Release
+    LINKER devices/Wireless/RW/RW612/gcc/RW612_ram.ld
 )
 
 mcux_convert_binary(BINARY ${APPLICATION_BINARY_DIR}/${MCUX_SDK_PROJECT_NAME}.bin)
+
+# mbedTLS uses newlib calloc/free; RW610_flash.ld defaults __heap_size__ to 1 KB (0x0400).
+target_link_options(${MCUX_SDK_PROJECT_NAME} PRIVATE "-Wl,--defsym=__heap_size__=0x10000")

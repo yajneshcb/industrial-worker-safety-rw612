@@ -43,8 +43,7 @@ void BUZZER_Init(void)
         .outputLogic  = (BUZZER_ACTIVE_LOW != 0) ? 1U : 0U
     };
 
-    /* Ensure Port 0 is initialized and configure Buzzer pin */
-    GPIO_PortInit(GPIO, APP_ACTUATOR_GPIO_PORT);
+    /* GPIO Port 0 is initialized once in BOARD_InitPins(); do not reset it here. */
     GPIO_PinInit(GPIO, APP_ACTUATOR_GPIO_PORT, BOARD_BUZZER_GPIO_PIN, &buzzerConfig);
     HW_BUZZER_Drive(false);
 }

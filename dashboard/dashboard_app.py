@@ -70,6 +70,13 @@ def parse_number(value: Any, field: str, minimum: float, maximum: float) -> floa
 
 KV_REST_API_URL = os.getenv("KV_REST_API_URL") or os.getenv("UPSTASH_REDIS_REST_URL", "")
 KV_REST_API_TOKEN = os.getenv("KV_REST_API_TOKEN") or os.getenv("UPSTASH_REDIS_REST_TOKEN", "")
+REMOTE_STATUS_URL = os.getenv(
+    "REMOTE_STATUS_URL",
+    "https://worker-safety-dashboard.vercel.app/api/status",
+).strip()
+REMOTE_STATUS_CACHE_SECONDS = 2.0
+_remote_status_lock = threading.Lock()
+_remote_status_cache: dict[str, Any] = {"expires_at": 0.0, "data": None}
 
 
 def _kv_command(command: list[str]) -> Any:
@@ -128,6 +135,37 @@ def _kv_load_snapshot() -> dict[str, Any] | None:
     return None
 
 
+def _remote_status_snapshot() -> dict[str, Any] | None:
+    """Read the current cloud mirror for local dashboards when the device posts via Wi-Fi."""
+    if not REMOTE_STATUS_URL:
+        return None
+    now = time.monotonic()
+    with _remote_status_lock:
+        if now < _remote_status_cache["expires_at"]:
+            return _remote_status_cache["data"]
+        try:
+            req = urllib.request.Request(
+                REMOTE_STATUS_URL,
+                headers={"Accept": "application/json", "Cache-Control": "no-cache"},
+            )
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            if not isinstance(payload, dict):
+                return None
+            if payload.get("has_telemetry"):
+                received_at = int(payload.get("received_at_ms") or 0)
+                if not received_at or epoch_ms() - received_at >= 10000:
+                    payload = None
+            _remote_status_cache["data"] = payload
+            _remote_status_cache["expires_at"] = now + REMOTE_STATUS_CACHE_SECONDS
+            return payload
+        except Exception as exc:
+            LOG.debug("Remote status read failed: %s", exc)
+            _remote_status_cache["data"] = None
+            _remote_status_cache["expires_at"] = now + REMOTE_STATUS_CACHE_SECONDS
+            return None
+
+
 class TelemetryStore:
     """Thread-safe current-state store with bounded histories and audit events."""
 
@@ -164,9 +202,14 @@ class TelemetryStore:
             "accel_z": None,
             "gas_ppm": None,
             "gas": None,
+            "gas_raw": None,
+            "gas_adc_v": None,
             "sos_active": False,
             "sos": False,
             "sensor_fault": False,
+            "temp_ok": None,
+            "mpu_ok": None,
+            "gas_ok": None,
             "sensor_status": "Awaiting Link",
             "safety_state": "OFFLINE",
             "hazard_type": "NONE",
@@ -239,13 +282,13 @@ class TelemetryStore:
                 node_state = "NORMAL"
 
         # Environmental critical thresholds are emergencies; warnings follow.
-        if gas >= 600.0:
+        if gas >= 850.0:
             return "EMERGENCY", "GAS_LEAK"
         if temp >= 50.0:
             return "EMERGENCY", "HIGH_TEMP"
         if sensor_fault:
             computed = ("WARNING", "SENSOR_FAULT")
-        elif gas >= 300.0:
+        elif gas >= 700.0:
             computed = ("WARNING", "GAS_LEAK")
         elif temp >= 40.0:
             computed = ("WARNING", "HIGH_TEMP")
@@ -370,6 +413,8 @@ class TelemetryStore:
                 "temp": temperature,
                 "gas_ppm": gas,
                 "gas": gas,
+                "gas_raw": parse_number(payload["gas_raw"], "gas_raw", 0, 65535) if "gas_raw" in payload else current.get("gas_raw"),
+                "gas_adc_v": parse_number(payload["gas_adc_v"], "gas_adc_v", 0, 1.2) if "gas_adc_v" in payload else current.get("gas_adc_v"),
                 "accel_magnitude_g": accel,
                 "accel": accel,
                 "accel_x": ax,
@@ -378,6 +423,9 @@ class TelemetryStore:
                 "sos_active": sos,
                 "sos": sos,
                 "sensor_fault": sensor_fault,
+                "temp_ok": parse_bool(payload["temp_ok"], "temp_ok") if "temp_ok" in payload else None,
+                "mpu_ok": parse_bool(payload["mpu_ok"], "mpu_ok") if "mpu_ok" in payload else None,
+                "gas_ok": parse_bool(payload["gas_ok"], "gas_ok") if "gas_ok" in payload else None,
                 "sensor_status": "Fault" if sensor_fault else "Nominal",
                 "node_reported_state": node_state,
                 "node_reported_hazard": node_hazard,
@@ -439,6 +487,9 @@ class TelemetryStore:
                 "link_source": "none",
                 "buffered": False,
                 "offline_queue_count": 0,
+                "temp_ok": None,
+                "mpu_ok": None,
+                "gas_ok": None,
                 "sensor_status": "Awaiting Link",
                 "safety_state": "OFFLINE",
                 "hazard_type": "NONE",
@@ -602,12 +653,16 @@ def route_manifest():
 @app.route("/api/index/api/status", methods=["GET"])
 def get_status():
     snap = store.snapshot()
-    if not snap.get("has_telemetry", False):
-        remote = _kv_load_snapshot()
+    local_received_at = int(snap.get("received_at_ms") or 0)
+    if snap.get("has_telemetry") and local_received_at and epoch_ms() - local_received_at < 10000:
+        return jsonify(snap)
+
+    for remote in (_kv_load_snapshot(), _remote_status_snapshot()):
         if remote and remote.get("has_telemetry", False):
-            received_at = remote.get("received_at_ms") or 0
-            if epoch_ms() - received_at < 10000:
+            received_at = int(remote.get("received_at_ms") or 0)
+            if received_at and epoch_ms() - received_at < 10000:
                 return jsonify(remote)
+
     return jsonify(snap)
 
 
@@ -668,12 +723,17 @@ def simulate():
             "link_source": "Simulation (Thermal Hazard)",
         },
         "gas_leak": {
-            "gas_ppm": 720.0,
+            "temperature_c": 26.5,
+            "gas_ppm": 880.0,
             "safety_state": "EMERGENCY",
             "hazard_type": "GAS_LEAK",
             "link_source": "Simulation (Gas Hazard)",
         },
         "sensor_fault": {
+            "temperature_c": 25.0,
+            "gas_ppm": 35.0,
+            "accel_magnitude_g": 1.0,
+            "sos_active": False,
             "sensor_fault": True,
             "safety_state": "WARNING",
             "hazard_type": "SENSOR_FAULT",
@@ -714,6 +774,11 @@ def simulate():
     sim_payload["link_state"] = "Connected"
     sim_payload["has_telemetry"] = True
 
+    if action in ("normal", "clear", "sensor_fault"):
+        with store.lock:
+            store.fall_latch_until = 0.0
+            store.freefall_time = None
+
     result = store.ingest(sim_payload, source="simulator")
     _kv_save_snapshot(result, force=True)
     return jsonify({"ok": True, "action": action, "data": result})
@@ -732,7 +797,7 @@ def serial_reader() -> None:
             ports = list(list_ports.comports())
         except Exception as exc:
             LOG.debug("Serial port scan failed: %s", exc)
-        match = next((port for port in ports if any(term in f"{port.description} {port.manufacturer} {port.hwid}".lower() for term in ("mcu-link", "mcu link", "nxp"))), None)
+        match = next((port for port in ports if any(term in f"{port.description} {port.manufacturer} {port.hwid}".lower() for term in ("mcu-link", "mcu link", "nxp", "jlink", "j-link"))), None)
         if match is None:
             with store.lock:
                 store.serial_state = "Scanning — no MCU-Link port"
@@ -746,6 +811,9 @@ def serial_reader() -> None:
                 while True:
                     line = connection.readline().decode("utf-8", errors="replace").strip()
                     if not line:
+                        continue
+                    if ">> WIFI:" in line:
+                        LOG.warning("RW612 %s", line.split(">> WIFI:", 1)[1].strip())
                         continue
                     marker = "[TELEMETRY]"
                     if marker not in line:
@@ -761,7 +829,7 @@ def serial_reader() -> None:
                 store.serial_state = "Reconnecting"
                 if store.state.get("link_source") == "USB Serial":
                     store.state["link_state"] = "Reconnecting"
-            LOG.info("MCU-Link serial connection ended: %s", exc)
+            LOG.warning("MCU-Link serial connection ended: %s", exc)
             time.sleep(3)
 
 
@@ -782,4 +850,4 @@ def start_serial_reader() -> None:
 start_serial_reader()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=DEBUG_ENDPOINTS)
+    app.run(host=os.getenv("HOST", "127.0.0.1"), port=int(os.getenv("PORT", "5000")), debug=DEBUG_ENDPOINTS)

@@ -59,21 +59,23 @@ void BOARD_InitHardware(void);
 
 /* ---- MQ-2 Toxic Gas & Smoke Sensor on GAU GPADC0 ----
  * NXP FRDM-RW612 ADC example: GAU_GPADC0, channel kADC_CH4 = GPIO_46 = Header J7 Pin 3.
- * ADC input voltage range is 0 - 1.2 V with a ~0.2 V minimum operating point.
- * Voltage divider: 36 kΩ top (AOUT side) + 10 kΩ bottom (GND side)
- * Divider ratio: 10 / (36 + 10) = 0.2174. At AOUT = 5.0 V, Vpin = 1.087 V (< 1.2 V).
- * Clean-air AOUT (~0.9-1.0 V) gives Vpin ~0.20-0.22 V, safely above the 0.2 V floor. */
+ * ADC input range is 0 - 1.2 V; SDK software-trigger example specifies input > 0.2 V.
+ * Installed divider: 47 kΩ top (AOUT side) + 10 kΩ bottom (GND side).
+ * Divider ratio: 10 / (47 + 10) = 0.1754. At AOUT = 5.0 V, Vpin = 0.877 V (< 1.2 V).
+ * The ADC input buffer is disabled; readings below 0.2 V are outside the board example's
+ * stated operating range and should be checked electrically instead of treated as proof
+ * that the sensor is working. */
 #define BOARD_MQ2_ADC_BASE            GAU_GPADC0
 #define BOARD_MQ2_ADC_CHANNEL         kADC_CH4
 #define BOARD_MQ2_ADC_GPIO            46U                      /* Header J7 Pin 3 */
 
-#define MQ2_DIVIDER_R_TOP_OHMS        36000.0f                 /* 36 kΩ top resistor */
+#define MQ2_DIVIDER_R_TOP_OHMS        47000.0f                 /* 47 kΩ top resistor */
 #define MQ2_DIVIDER_R_BOTTOM_OHMS     10000.0f                 /* 10 kΩ bottom resistor */
 #define MQ2_DIVIDER_RATIO             (MQ2_DIVIDER_R_BOTTOM_OHMS / (MQ2_DIVIDER_R_TOP_OHMS + MQ2_DIVIDER_R_BOTTOM_OHMS))
 
 #define MQ2_ADC_VREF_VOLTS            1.2f                     /* GAU GPADC internal reference */
 #define MQ2_ADC_FULLSCALE_COUNTS      32768.0f                 /* 16-bit single-ended full-scale */
-#define MQ2_ADC_MIN_CLEAN_VOLTS       0.18f                    /* Below this threshold, treat as clean air */
+#define MQ2_ADC_MIN_RECOMMENDED_VOLTS 0.20f                    /* SDK example's stated minimum; low readings remain visible for diagnosis */
 
 /* MQ-2 Electrical & Calibration Settings */
 #define MQ2_VCC_VOLTS                 5.0f
@@ -108,11 +110,11 @@ void BOARD_InitHardware(void);
 /*******************************************************************************
  * Edge Safety Thresholds
  ******************************************************************************/
-#define THRESHOLD_TEMP_HIGH_WARNING    40.0f                   /* Deg C (Board surface self-heating taken into account) */
-#define THRESHOLD_TEMP_HIGH_EMERGENCY  50.0f                   /* Deg C */
+#define THRESHOLD_TEMP_HIGH_WARNING    40.0f                   /* Deg C (Synopsis warning; above ~31 C ambient) */
+#define THRESHOLD_TEMP_HIGH_EMERGENCY  50.0f                   /* Deg C (Synopsis critical) */
 
-#define THRESHOLD_GAS_WARNING_PPM      300.0f                  /* Gas Index / PPM warning */
-#define THRESHOLD_GAS_EMERGENCY_PPM    600.0f                  /* Gas Index / PPM emergency */
+#define THRESHOLD_GAS_WARNING_PPM      700.0f                  /* Gas Index warning (clean-air bench baseline ~590) */
+#define THRESHOLD_GAS_EMERGENCY_PPM    850.0f                  /* Gas Index emergency */
 
 #define THRESHOLD_FALL_ACCEL_MIN_G     0.4f                    /* Free-fall lower threshold (<0.4g) */
 #define THRESHOLD_FALL_IMPACT_MAX_G    2.5f                    /* Impact shock threshold (>2.5g) */
@@ -136,11 +138,20 @@ void BOARD_InitHardware(void);
 #define DASHBOARD_SERVER_IP            "192.168.0.100"
 #endif
 #ifndef DASHBOARD_SERVER_PORT
-#define DASHBOARD_SERVER_PORT          5000U
+#define DASHBOARD_SERVER_PORT          443U
+#endif
+#ifndef DASHBOARD_SERVER_HOST
+#define DASHBOARD_SERVER_HOST          "worker-safety-dashboard.vercel.app"
+#endif
+#ifndef DASHBOARD_SERVER_PATH
+#define DASHBOARD_SERVER_PATH          "/api/telemetry"
+#endif
+#ifndef TELEMETRY_SECRET_VALUE
+#define TELEMETRY_SECRET_VALUE         ""
 #endif
 
 #ifndef WIFI_STACK_AVAILABLE
-#define WIFI_STACK_AVAILABLE           0
+#define WIFI_STACK_AVAILABLE           1
 #endif
 
 #endif /* _APP_CONFIG_H_ */

@@ -1,62 +1,67 @@
 {
   "version": 7,
   "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 22,
-    "patch": 0
+    "major": 3
   },
   "configurePresets": [
     {
-      "name": "base",
-      "hidden": true,
-      "generator": "Ninja",
-      "cacheVariables": {
-        "SdkRootDirPath": "$env{MCUX_SDK_PATH}",
-        "board": "frdmrw612",
-        "CONFIG_TOOLCHAIN": "armgcc",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_SYSTEM_NAME": "Generic",
-        "CMAKE_SYSTEM_PROCESSOR": "cortex-m33",
-        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
-        "CMAKE_C_COMPILER": "$env{ARMGCC_DIR}/bin/arm-none-eabi-gcc.exe",
-        "CMAKE_CXX_COMPILER": "$env{ARMGCC_DIR}/bin/arm-none-eabi-g++.exe",
-        "CMAKE_ASM_COMPILER": "$env{ARMGCC_DIR}/bin/arm-none-eabi-gcc.exe"
-      },
-      "environment": {
-        "PATH": "$env{ARMGCC_DIR}/bin${pathListSep}$penv{PATH}"
-      }
-    },
-    {
       "name": "debug",
-      "displayName": "Debug",
-      "description": "Debug build (needs env vars MCUX_SDK_PATH and ARMGCC_DIR, see docs/BUILD.md)",
-      "inherits": "base",
-      "binaryDir": "${sourceDir}/build/debug",
+      "displayName": "debug",
+      "generator": "Ninja",
+      "binaryDir": "${fileDir}/${presetName}",
+      "toolchainFile": "$env{SdkRootDirPath}/mcuxsdk/cmake/toolchain/armgcc.cmake",
+      "inherits": "debug-env",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "APP_DIR": {
+          "value": "${fileDir}",
+          "type": "PATH"
+        },
+        "CMAKE_BUILD_TYPE": "debug",
+        "SdkRootDirPath": "$env{SdkRootDirPath}/mcuxsdk",
+        "CONFIG_TOOLCHAIN": "armgcc",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "$env{binaryDir}",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "$env{binaryDir}",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "$env{binaryDir}",
+        "WEST": "TRUE",
+        "board": "frdmrw612"
       }
     },
     {
       "name": "release",
-      "displayName": "Release",
-      "description": "Optimized build (needs env vars MCUX_SDK_PATH and ARMGCC_DIR, see docs/BUILD.md)",
-      "inherits": "base",
-      "binaryDir": "${sourceDir}/build/release",
+      "displayName": "release",
+      "generator": "Ninja",
+      "binaryDir": "${fileDir}/${presetName}",
+      "toolchainFile": "$env{SdkRootDirPath}/mcuxsdk/cmake/toolchain/armgcc.cmake",
+      "inherits": "release-env",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "APP_DIR": {
+          "value": "${fileDir}",
+          "type": "PATH"
+        },
+        "CMAKE_BUILD_TYPE": "release",
+        "SdkRootDirPath": "$env{SdkRootDirPath}/mcuxsdk",
+        "CONFIG_TOOLCHAIN": "armgcc",
+        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "$env{binaryDir}",
+        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "$env{binaryDir}",
+        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "$env{binaryDir}",
+        "WEST": "TRUE",
+        "board": "frdmrw612"
       }
     }
   ],
   "buildPresets": [
     {
       "name": "debug",
-      "displayName": "Debug",
+      "displayName": "debug",
       "configurePreset": "debug"
     },
     {
       "name": "release",
-      "displayName": "Release",
+      "displayName": "release",
       "configurePreset": "release"
     }
+  ],
+  "include": [
+    "mcux_include.json"
   ]
 }

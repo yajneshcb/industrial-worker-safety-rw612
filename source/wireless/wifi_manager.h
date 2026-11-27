@@ -34,6 +34,7 @@ WirelessStatus_t WIFI_Manager_GetStatus(void);
 bool WIFI_Manager_IsConnected(void);
 void WIFI_Manager_Process(void);
 void WIFI_Manager_SetCredentials(const char *ssid, const char *password);
+bool WIFI_Manager_QueuePayload(const char *payload);
 
 #if defined(__cplusplus)
 }

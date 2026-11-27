@@ -7,7 +7,7 @@
   <meta name="description" content="Industrial Worker Safety Monitoring and Real-Time Hazard Alert System for NXP FRDM-RW612 edge safety node.">
   <title>RW612 Safety Node | Mission Control Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="/static/safety-mark.svg">
-  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=usb-live-20261127">
 </head>
 <body>
   <div class="app-shell">
@@ -51,16 +51,6 @@
           <time id="liveClock" class="clock-value">--:--:-- --</time>
           <span class="clock-date" id="liveDate">---</span>
         </div>
-
-        <button class="web-serial-btn" id="serialConnectBtn" type="button" aria-label="Direct USB Serial connection to FRDM-RW612" title="Direct Web Serial connection to MCU-Link (115200 baud)">
-          <span class="serial-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-            </svg>
-          </span>
-          <span id="serialBtnText">USB DIRECT</span>
-        </button>
 
         <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle light and dark mode" title="Toggle color theme">
           <span class="theme-icon sun-icon">
@@ -266,6 +256,7 @@
               </div>
               <span class="aqi-label" id="gasQuality">OFFLINE</span>
             </div>
+            <div class="gas-diagnostic" id="gasDiagnostic">ADC raw — · pin — V</div>
             <div class="gas-meter" role="img" aria-label="Relative MQ-2 output index with demonstration warning at 300 and critical at 600">
               <div class="gas-zones"><i></i><i></i><i></i></div>
               <div class="gas-track">
@@ -275,20 +266,20 @@
               </div>
               <div class="meter-scale">
                 <span>0</span>
-                <span>300 <em>WARN</em></span>
-                <span>600 <em>CRITICAL</em></span>
-                <span>800+</span>
+                <span>700 <em>WARN</em></span>
+                <span>850 <em>CRITICAL</em></span>
+                <span>1000</span>
               </div>
             </div>
             <div class="gas-legend">
-              <span><i class="safe-swatch"></i>SAFE <b>&lt;300</b></span>
-              <span><i class="warning-swatch"></i>WARN <b>300–599</b></span>
-              <span><i class="danger-swatch"></i>DANGER <b>≥600</b></span>
+              <span><i class="safe-swatch"></i>SAFE <b>&lt;700</b></span>
+              <span><i class="warning-swatch"></i>WARN <b>700–849</b></span>
+              <span><i class="danger-swatch"></i>DANGER <b>≥850</b></span>
             </div>
             <div class="sparkline-box gas-spark">
               <div class="sparkline-head">
                 <span>GAS TREND</span>
-                <span>DEMO LIMIT <b>300 INDEX</b></span>
+                <span>DEMO LIMIT <b>700 INDEX</b></span>
               </div>
               <svg class="sparkline" id="gasSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent gas concentration trend"></svg>
             </div>
@@ -493,7 +484,7 @@
           </div>
           <div class="panel-foot">
             <span><i class="small-live-dot"></i><span id="telemetryLogCount">0</span> / 120 SAMPLES IN SESSION BUFFER</span>
-            <span>NEWEST FIRST · USB DIRECT SAMPLES SAVED IN THIS BROWSER</span>
+            <span>NEWEST FIRST · LIVE USB / WIFI TELEMETRY</span>
           </div>
         </article>
       </section>
@@ -517,6 +508,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/static/js/dashboard.js" defer></script>
+  <script src="/static/js/dashboard.js?v=usb-live-20261127" defer></script>
 </body>
 </html>

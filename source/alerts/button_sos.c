@@ -52,8 +52,7 @@ void BUTTON_SOS_Init(void)
         .polarity = kGPIO_PinIntEnableLowOrFall
     };
 
-    /* Ensure GPIO Port 0 clock is enabled */
-    GPIO_PortInit(GPIO, APP_SOS_GPIO_PORT);
+    /* GPIO Port 0 is initialized once in BOARD_InitPins(); do not reset it here. */
 
     /* Configure GPIO_11 as digital input */
     GPIO_PinInit(GPIO, APP_SOS_GPIO_PORT, APP_SOS_GPIO_PIN, &btnConfig);

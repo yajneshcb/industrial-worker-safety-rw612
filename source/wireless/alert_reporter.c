@@ -8,6 +8,7 @@
 #include "wifi_manager.h"
 #include "app_config.h"
 #include "fsl_debug_console.h"
+#include <stdio.h>
 
 /*******************************************************************************
  * Global Metrics Live State
@@ -16,15 +17,6 @@ volatile uint32_t g_telemetryPacketsSent = 0U;
 volatile uint32_t g_emergencyAlertsSent  = 0U;
 volatile uint32_t g_offlineQueueCount    = 0U;
 volatile uint32_t g_lastPacketId         = 0U;
-
-/*******************************************************************************
- * Offline Fault-Tolerant Ring Buffer
- ******************************************************************************/
-#define OFFLINE_QUEUE_CAPACITY 16U
-
-static TelemetryPacket_t s_offlineQueue[OFFLINE_QUEUE_CAPACITY];
-static uint32_t          s_queueHead = 0U;
-static uint32_t          s_queueTail = 0U;
 
 static const char *GetStateString(SafetyState_t state)
 {
@@ -83,12 +75,17 @@ static void DispatchPacketToTransport(const TelemetryPacket_t *pkt)
     Fixed2_t ay = ToFixed2(pkt->accel_y_g);
     Fixed2_t az = ToFixed2(pkt->accel_z_g);
     Fixed2_t g  = ToFixed2(pkt->gas_ppm);
-
-    PRINTF("[TELEMETRY] {\"id\":%u,\"uptime_ms\":%u,"
+    Fixed2_t gv = ToFixed2(pkt->gas_adc_pin_voltage_v);
+    char payload[560];
+    int payloadLength = snprintf(payload, sizeof(payload),
+           "{\"id\":%u,\"uptime_ms\":%u,"
            "\"temp\":%s%d.%02d,\"accel\":%s%d.%02d,"
            "\"accel_x\":%s%d.%02d,\"accel_y\":%s%d.%02d,\"accel_z\":%s%d.%02d,"
-           "\"gas\":%s%d.%02d,\"state\":\"%s\",\"hazard\":\"%s\","
-           "\"sos\":%s,\"sensors_ok\":%s,\"offline_queue_count\":%u}\r\n",
+           "\"gas\":%s%d.%02d,\"gas_raw\":%u,\"gas_adc_v\":%s%d.%02d,"
+           "\"state\":\"%s\",\"hazard\":\"%s\","
+           "\"sos\":%s,\"sensors_ok\":%s,"
+           "\"temp_ok\":%s,\"mpu_ok\":%s,\"gas_ok\":%s,"
+           "\"offline_queue_count\":%u}",
            (unsigned int)pkt->message_id,
            (unsigned int)pkt->timestamp_ms,
            t.sign,  t.whole,  t.frac,
@@ -97,31 +94,22 @@ static void DispatchPacketToTransport(const TelemetryPacket_t *pkt)
            ay.sign, ay.whole, ay.frac,
            az.sign, az.whole, az.frac,
            g.sign,  g.whole,  g.frac,
+           (unsigned int)pkt->gas_raw_adc,
+           gv.sign, gv.whole, gv.frac,
            GetStateString(pkt->state),
            GetHazardString(pkt->hazard),
            pkt->sos_active ? "true" : "false",
            pkt->sensors_ok ? "true" : "false",
+           pkt->temp_ok ? "true" : "false",
+           pkt->mpu_ok ? "true" : "false",
+           pkt->gas_ok ? "true" : "false",
            (unsigned int)g_offlineQueueCount);
-}
 
-static void EnqueueOffline(const TelemetryPacket_t *packet)
-{
-#if !WIFI_STACK_AVAILABLE
-    /* No Wi-Fi stack: the console line already printed is the real delivery path, so buffering would
-     * only fill a queue that can never be flushed and report a misleading offline_queue_count. */
-    (void)packet;
-    return;
-#else
-    /* When full, drop the OLDEST entry so the newest (most relevant / emergency) data is kept. */
-    if (g_offlineQueueCount >= OFFLINE_QUEUE_CAPACITY)
+    if ((payloadLength > 0) && ((size_t)payloadLength < sizeof(payload)))
     {
-        s_queueTail = (s_queueTail + 1U) % OFFLINE_QUEUE_CAPACITY;
-        g_offlineQueueCount--;
+        PRINTF("[TELEMETRY] %s\r\n", payload);
+        (void)WIFI_Manager_QueuePayload(payload);
     }
-    s_offlineQueue[s_queueHead] = *packet;
-    s_queueHead = (s_queueHead + 1U) % OFFLINE_QUEUE_CAPACITY;
-    g_offlineQueueCount++;
-#endif
 }
 
 /*******************************************************************************
@@ -135,8 +123,7 @@ void ALERT_Reporter_Init(void)
     g_offlineQueueCount    = 0U;
     g_lastPacketId         = 0U;
 
-    s_queueHead = 0U;
-    s_queueTail = 0U;
+    g_offlineQueueCount = 0U;
 }
 
 bool ALERT_Reporter_SendTelemetry(const TelemetryPacket_t *packet)
@@ -155,13 +142,10 @@ bool ALERT_Reporter_SendTelemetry(const TelemetryPacket_t *packet)
     if (WIFI_Manager_IsConnected())
     {
         g_telemetryPacketsSent++;
-        g_wifiPacketsSent++;
         return true;
     }
 
-    /* 2. Wi-Fi link dropped: Store in offline fault-tolerant queue */
-    EnqueueOffline(packet);
-
+    /* Do not replay stale movement data after a Wi-Fi outage. The next fresh sample is sent. */
     return false;
 }
 
@@ -181,29 +165,15 @@ bool ALERT_Reporter_SendEmergencyAlert(const TelemetryPacket_t *packet)
     if (WIFI_Manager_IsConnected())
     {
         g_telemetryPacketsSent++;
-        g_wifiPacketsSent++;
         return true;
     }
-
-    /* Emergency packets take priority into the offline buffer */
-    EnqueueOffline(packet);
 
     return false;
 }
 
 void ALERT_Reporter_ProcessQueue(void)
 {
-    /* If connection restored, flush buffered packets */
-    if (WIFI_Manager_IsConnected() && (g_offlineQueueCount > 0U))
-    {
-        const TelemetryPacket_t *queuedPacket = &s_offlineQueue[s_queueTail];
-        DispatchPacketToTransport(queuedPacket);
-
-        s_queueTail = (s_queueTail + 1U) % OFFLINE_QUEUE_CAPACITY;
-        g_offlineQueueCount--;
-        g_telemetryPacketsSent++;
-        g_wifiPacketsSent++;
-    }
+    /* Fresh packets are handed directly to WIFI_Manager's one-sample queue. */
 }
 
 

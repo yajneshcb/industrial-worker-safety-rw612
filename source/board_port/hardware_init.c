@@ -19,19 +19,36 @@
 
 void BOARD_InitHardware(void)
 {
-    /* 1. Initialize pins configured in pin_mux.c */
-    BOARD_InitPins();
+    /* Follow the FRDM-RW612 Wi-Fi example's boot sequence. In particular, the
+     * XIP image needs the low-power boot clocks and OTP/ELS setup before the
+     * WLAN firmware is initialized by WPL_Init(). */
+    BOARD_InitBootPins();
+    if (BOARD_IS_XIP())
+    {
+        BOARD_BootClockLPR();
+        CLOCK_EnableClock(kCLOCK_Otp);
+        CLOCK_EnableClock(kCLOCK_Els);
+        CLOCK_EnableClock(kCLOCK_ElsApb);
+        RESET_PeripheralReset(kOTP_RST_SHIFT_RSTn);
+        RESET_PeripheralReset(kELS_APB_RST_SHIFT_RSTn);
+    }
+    else
+    {
+        BOARD_InitBootClocks();
+    }
 
-    /* 2. Configure system clocks to RUN mode using SDK board clock generator */
-    BOARD_BootClockRUN();
-
-    /* 3. Initialize Flexcomm 3 Debug Console UART (GPIO_24) for USB MCU-Link serial communication */
+    /* Initialize Flexcomm 3 Debug Console UART (GPIO_24). */
     BOARD_InitDebugConsole();
 
-    /* 4. Attach Flexcomm 2 (I2C bus for P3T1755 and MPU-6050): SFRO 16 MHz per SDK example */
+    /* Complete the SDK Wi-Fi board initialization before WPL_Init(). */
+    RESET_PeripheralReset(kGDMA_RST_SHIFT_RSTn);
+    POWER_ConfigCauInSleep(false);
+    BOARD_InitSleepPinConfig();
+
+    /* Attach Flexcomm 2 I2C clock for P3T1755 and MPU-6050. */
     CLOCK_AttachClk(BOARD_I2C_CLK_ATTACH);
 
-    /* 5. Attach and enable GAU General-Purpose ADC clock and power */
+    /* Attach and enable the GAU ADC clock and power. */
     CLOCK_AttachClk(kT3PLL_MCI_256M_to_GAU_CLK);
     CLOCK_SetClkDiv(kCLOCK_DivGauClk, 4U);
     CLOCK_EnableClock(kCLOCK_Gau);

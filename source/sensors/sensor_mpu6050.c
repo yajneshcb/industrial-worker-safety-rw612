@@ -107,8 +107,24 @@ static bool MPU6050_TryConfigure(void)
 
     if (MPU6050_ReadBytes(MPU6050_REG_WHO_AM_I, &whoami, 1U) != kStatus_Success)
     {
-        PRINTF(">> MPU: no I2C response at 0x%02X (check SDA/SCL/VCC/GND, AD0 level)\r\n",
-               (unsigned int)BOARD_MPU6050_I2C_ADDR);
+        uint8_t altWhoami = 0U;
+        i2c_master_transfer_t altXfer;
+        altXfer.flags          = kI2C_TransferDefaultFlag;
+        altXfer.slaveAddress   = 0x69U;
+        altXfer.direction      = kI2C_Read;
+        altXfer.subaddress     = MPU6050_REG_WHO_AM_I;
+        altXfer.subaddressSize = 1U;
+        altXfer.data           = &altWhoami;
+        altXfer.dataSize       = 1U;
+        if (I2C_MasterTransferBlocking(BOARD_MPU6050_I2C_BASE, &altXfer) == kStatus_Success)
+        {
+            PRINTF(">> MPU: responded at 0x69 (AD0 is HIGH) instead of 0x68 - tie AD0 to GND\r\n");
+        }
+        else
+        {
+            PRINTF(">> MPU: no I2C response at 0x%02X (check SDA J2-18/SCL J2-20/3V3/GND)\r\n",
+                   (unsigned int)BOARD_MPU6050_I2C_ADDR);
+        }
         return false;
     }
 

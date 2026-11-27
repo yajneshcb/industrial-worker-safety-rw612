@@ -30,8 +30,7 @@ void LEDS_Init(void)
         .outputLogic  = 0U
     };
 
-    /* Ensure Port 0 is initialized */
-    GPIO_PortInit(GPIO, APP_ACTUATOR_GPIO_PORT);
+    /* GPIO Port 0 is initialized once in BOARD_InitPins(); do not reset it here. */
 
     /* Initialize each status LED pin as digital output */
     GPIO_PinInit(GPIO, APP_ACTUATOR_GPIO_PORT, BOARD_LED_NORMAL_PIN, &ledConfig);

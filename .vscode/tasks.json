@@ -2,38 +2,56 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Flash FRDM-RW612 Firmware (Direct Flash)",
-      "type": "shell",
-      "command": "powershell -ExecutionPolicy Bypass -File .\\flash_firmware.ps1",
-      "problemMatcher": [],
+      "type": "cmake",
+      "label": "CMake: build",
+      "command": "build",
+      "preset": "debug",
+      "targets": [
+        "all"
+      ],
       "group": {
         "kind": "build",
         "isDefault": true
       },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "detail": "CMake template build task"
     },
     {
-      "label": "Start Serial Bridge (MCU-Link -> Local/Cloud)",
-      "type": "shell",
-      "command": "python serial_bridge.py --baud 115200 --raw",
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      }
+      "type": "cmake",
+      "label": "CMake: configure",
+      "command": "configure",
+      "preset": "debug",
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "detail": "CMake template configure task"
     },
     {
-      "label": "Start Local Dashboard Server",
-      "type": "shell",
-      "command": "python dashboard/dashboard_app.py",
-      "problemMatcher": [],
+      "type": "process",
+      "label": "Dashboard: start USB telemetry",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\dashboard\\start_dashboard.ps1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "presentation": {
-        "reveal": "always",
-        "panel": "new"
-      }
+        "reveal": "silent",
+        "panel": "dedicated",
+        "focus": false,
+        "clear": false
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "problemMatcher": []
     }
   ]
 }

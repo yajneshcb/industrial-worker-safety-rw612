@@ -15,6 +15,7 @@
  ******************************************************************************/
 typedef struct {
     uint32_t raw_adc_value;
+    float    adc_pin_voltage_v;
     float    voltage_v;
     float    gas_ppm;
     bool     is_valid;

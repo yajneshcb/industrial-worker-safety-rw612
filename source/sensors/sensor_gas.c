@@ -4,7 +4,7 @@
  * Platform: NXP FRDM-RW612 (Cortex-M33)
  *
  * Uses NXP MCUXpresso SDK cns_adc driver (GAU_GPADC0, Channel kADC_CH4 on GPIO_46 / Header J7 Pin 3).
- * Converts 0-1.2V ADC pin readings back through the 36k/10k hardware voltage divider to measure
+ * Converts 0-1.2V ADC pin readings back through the 47k/10k hardware voltage divider to measure
  * actual MQ-2 AOUT (0-5.0V), then computes sensor resistance (Rs) and PPM.
  */
 
@@ -33,6 +33,7 @@ static void RecordFailure(GasSensorData_t *out_data)
     if (out_data != NULL)
     {
         out_data->raw_adc_value = 0U;
+        out_data->adc_pin_voltage_v = 0.0f;
         out_data->voltage_v     = 0.0f;
         out_data->gas_ppm       = 0.0f;
         out_data->is_valid      = false;
@@ -97,13 +98,7 @@ float SENSOR_Gas_RawToPpm(uint32_t raw_adc)
         v_pin = MQ2_ADC_VREF_VOLTS;
     }
 
-    /* Below the clean-air baseline floor (e.g. <0.18V at pin), consider clean air */
-    if (v_pin < MQ2_ADC_MIN_CLEAN_VOLTS)
-    {
-        return 0.0f;
-    }
-
-    /* 2. Compensate for the 36k top / 10k bottom resistor divider to obtain true AOUT */
+    /* 2. Compensate for the 47k top / 10k bottom resistor divider to obtain true AOUT */
     float v_aout = v_pin / MQ2_DIVIDER_RATIO;
     if (v_aout > MQ2_VCC_VOLTS)
     {
@@ -215,6 +210,7 @@ bool SENSOR_Gas_Read(GasSensorData_t *out_data)
     float ppm = SENSOR_Gas_RawToPpm(rawCounts);
 
     out_data->raw_adc_value = rawCounts;
+    out_data->adc_pin_voltage_v = v_pin;
     out_data->voltage_v     = v_aout;
     out_data->gas_ppm       = ppm;
     out_data->is_valid      = true;

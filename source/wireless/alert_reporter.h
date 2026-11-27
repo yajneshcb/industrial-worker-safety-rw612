@@ -28,12 +28,17 @@ typedef struct {
     HazardType_t hazard;
     float temperature_c;
     float gas_ppm;
+    uint32_t gas_raw_adc;
+    float gas_adc_pin_voltage_v;
     float accel_magnitude_g;
     float accel_x_g;
     float accel_y_g;
     float accel_z_g;
     bool sos_active;
     bool sensors_ok;      /* false if any sensor is currently faulted / invalid */
+    bool temp_ok;
+    bool mpu_ok;
+    bool gas_ok;
 } TelemetryPacket_t;
 
 #if defined(__cplusplus)

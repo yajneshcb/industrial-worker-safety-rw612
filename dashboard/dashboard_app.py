@@ -135,35 +135,44 @@ def _kv_load_snapshot() -> dict[str, Any] | None:
     return None
 
 
+_remote_refresh_inflight = False
+
+
+def _refresh_remote_status_async() -> None:
+    global _remote_refresh_inflight
+    try:
+        req = urllib.request.Request(
+            REMOTE_STATUS_URL,
+            headers={"Accept": "application/json", "Cache-Control": "no-cache"},
+        )
+        with urllib.request.urlopen(req, timeout=2.5) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        if not isinstance(payload, dict):
+            payload = None
+        elif payload.get("has_telemetry"):
+            received_at = int(payload.get("received_at_ms") or 0)
+            if not received_at or epoch_ms() - received_at >= 10000:
+                payload = None
+    except Exception as exc:
+        LOG.debug("Remote status read failed: %s", exc)
+        payload = None
+    with _remote_status_lock:
+        _remote_status_cache["data"] = payload
+        _remote_status_cache["expires_at"] = time.monotonic() + REMOTE_STATUS_CACHE_SECONDS
+        _remote_refresh_inflight = False
+
+
 def _remote_status_snapshot() -> dict[str, Any] | None:
-    """Read the current cloud mirror for local dashboards when the device posts via Wi-Fi."""
+    """Return cached cloud mirror without ever blocking the local /api/status response."""
+    global _remote_refresh_inflight
     if not REMOTE_STATUS_URL:
         return None
     now = time.monotonic()
     with _remote_status_lock:
-        if now < _remote_status_cache["expires_at"]:
-            return _remote_status_cache["data"]
-        try:
-            req = urllib.request.Request(
-                REMOTE_STATUS_URL,
-                headers={"Accept": "application/json", "Cache-Control": "no-cache"},
-            )
-            with urllib.request.urlopen(req, timeout=2.5) as resp:
-                payload = json.loads(resp.read().decode("utf-8"))
-            if not isinstance(payload, dict):
-                return None
-            if payload.get("has_telemetry"):
-                received_at = int(payload.get("received_at_ms") or 0)
-                if not received_at or epoch_ms() - received_at >= 10000:
-                    payload = None
-            _remote_status_cache["data"] = payload
-            _remote_status_cache["expires_at"] = now + REMOTE_STATUS_CACHE_SECONDS
-            return payload
-        except Exception as exc:
-            LOG.debug("Remote status read failed: %s", exc)
-            _remote_status_cache["data"] = None
-            _remote_status_cache["expires_at"] = now + REMOTE_STATUS_CACHE_SECONDS
-            return None
+        if now >= _remote_status_cache["expires_at"] and not _remote_refresh_inflight:
+            _remote_refresh_inflight = True
+            threading.Thread(target=_refresh_remote_status_async, name="remote-status-poll", daemon=True).start()
+        return _remote_status_cache["data"]
 
 
 class TelemetryStore:

@@ -164,6 +164,7 @@ int DASHBOARD_PostJson(const char *host, const char *path, unsigned short port,
         goto cleanup;
     }
     mbedtls_ssl_conf_authmode(&config, MBEDTLS_SSL_VERIFY_OPTIONAL);
+    mbedtls_ssl_conf_max_tls_version(&config, MBEDTLS_SSL_VERSION_TLS1_2);
     mbedtls_ssl_conf_ca_chain(&config, &ca, NULL);
     mbedtls_ssl_conf_rng(&config, mbedtls_ctr_drbg_random, &random);
     result = mbedtls_ssl_setup(&ssl, &config);

@@ -31,7 +31,7 @@
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     const meta = $('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', theme === 'light' ? '#f8fafc' : '#090c11');
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#f4f6f9' : '#0b0f19');
     const label = $('#themeToggleLabel');
     if (label) label.textContent = theme === 'light' ? 'DARK' : 'LIGHT';
     try {
@@ -52,13 +52,18 @@
       second: '2-digit',
       hour12: true
     }).toUpperCase();
-    $('#liveClock').textContent = timeStr;
-    $('#liveDate').textContent = now.toLocaleDateString('en-US', {
+    const dateStr = now.toLocaleDateString('en-US', {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
       day: '2-digit'
     }).toUpperCase();
+    $('#liveClock').textContent = timeStr;
+    $('#liveDate').textContent = dateStr;
+    const mobileClock = $('#liveClockMobile');
+    const mobileDate = $('#liveDateMobile');
+    if (mobileClock) mobileClock.textContent = timeStr;
+    if (mobileDate) mobileDate.textContent = dateStr;
   }
 
   function showToast(message) {
@@ -211,6 +216,9 @@
       gasNeedle.style.left = '0%';
       $('#gasSensorLive').className = 'sensor-live';
       $('#gasDiagnostic').textContent = 'ADC raw — · pin — V';
+      if ($('#mobileTempValue')) $('#mobileTempValue').textContent = '—';
+      if ($('#mobileAccelValue')) $('#mobileAccelValue').textContent = '—';
+      if ($('#mobileGasValue')) $('#mobileGasValue').textContent = '—';
       drawEmptySparkline($('#gasSpark'), 'Awaiting MQ-2 sensor link…');
 
       // Section 01: Actuator Hardware Twin
@@ -326,6 +334,10 @@
         ? 'ADC raw — · pin — V'
         : `ADC raw ${fmt(gasRaw, 0)} · pin ${fmt(gasAdcV, 3)} V`);
 
+    if ($('#mobileTempValue')) $('#mobileTempValue').textContent = `${fmt(temp, 1)}°`;
+    if ($('#mobileAccelValue')) $('#mobileAccelValue').textContent = mpuFault ? 'FAULT' : `${fmt(accel, 2)}g`;
+    if ($('#mobileGasValue')) $('#mobileGasValue').textContent = gasFault ? 'FAULT' : fmt(gas, gas % 1 ? 1 : 0);
+
     // Card 4: Actuator Mirror
     renderActuators(data);
 
@@ -433,7 +445,7 @@
       const time = Number.isFinite(receivedAt) && receivedAt > 0 ? formatTime(new Date(receivedAt).toISOString()) : '—';
       const stateName = String(sample.safety_state || 'OFFLINE');
       const hazard = String(sample.hazard_type || 'NONE');
-      return `<tr><td>${escapeHTML(time)}</td><td>${escapeHTML(sample.id ?? '—')}</td><td>${escapeHTML(fmt(sample.temperature_c, 1))}</td><td>${escapeHTML(fmt(sample.accel_magnitude_g, 2))}</td><td>${escapeHTML(fmt(sample.gas_ppm, 0))}</td><td><span class="severity-tag ${stateName.toLowerCase()}">${escapeHTML(stateName)}</span> · ${escapeHTML(hazard)}</td></tr>`;
+      return `<tr><td>${escapeHTML(time)}</td><td>${escapeHTML(sample.id ?? '—')}</td><td data-label="TEMP °C">${escapeHTML(fmt(sample.temperature_c, 1))}</td><td data-label="MOTION g">${escapeHTML(fmt(sample.accel_magnitude_g, 2))}</td><td data-label="GAS INDEX">${escapeHTML(fmt(sample.gas_ppm, 0))}</td><td><span class="severity-tag ${stateName.toLowerCase()}">${escapeHTML(stateName)}</span> · ${escapeHTML(hazard)}</td></tr>`;
     }).join('');
   }
 
@@ -578,6 +590,16 @@
     $('#exportJson').addEventListener('click', exportJSON);
     $('#exportTelemetryCsv').addEventListener('click', exportTelemetryCSV);
     $('#audioButton').addEventListener('click', toggleAudio);
+
+    const mobileMetaToggle = $('#mobileMetaToggle');
+    const mobileMetaDetails = $('#mobileMetaDetails');
+    if (mobileMetaToggle && mobileMetaDetails) {
+      mobileMetaToggle.addEventListener('click', () => {
+        const expanded = mobileMetaToggle.getAttribute('aria-expanded') === 'true';
+        mobileMetaToggle.setAttribute('aria-expanded', String(!expanded));
+        mobileMetaDetails.hidden = expanded;
+      });
+    }
 
     const themeBtn = $('#themeToggle');
     if (themeBtn) {

@@ -1,7 +1,10 @@
 :root {
   color-scheme: dark;
-  --bg: #090c11;
-  --bg-gradient: radial-gradient(ellipse at 40% -20%, rgba(39, 62, 81, .17), transparent 48%), #090c11;
+  --bg: #0b0f19;
+  --bg-gradient: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                 radial-gradient(ellipse at 40% -20%, rgba(39, 62, 81, .22), transparent 52%),
+                 #0b0f19;
+  --bg-size: 22px 22px, 100% 100%, 100% 100%;
   --panel: #0f141c;
   --panel-2: #111923;
   --panel-hi: #151f2b;
@@ -22,9 +25,10 @@
   --red-soft: #3b171d;
   --cyan: #53d6e9;
   --slate: #94a3b8;
-  --card-border: #1d2834;
+  --card-border: rgba(255, 255, 255, 0.08);
   --card-shadow: none;
-  --topbar-border: #202a36;
+  --topbar-border: rgba(255, 255, 255, 0.08);
+  --topbar-mobile-bg: rgba(11, 15, 25, 0.84);
   --divider: #293442;
   --badge-border: #29333e;
   --badge-bg: transparent;
@@ -58,8 +62,11 @@
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg: #f8fafc;
-  --bg-gradient: radial-gradient(ellipse at 40% -20%, rgba(203, 213, 225, .55), transparent 50%), #f8fafc;
+  --bg: #f4f6f9;
+  --bg-gradient: linear-gradient(to right, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+                 linear-gradient(to bottom, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+                 #f4f6f9;
+  --bg-size: 24px 24px, 24px 24px, 100% 100%;
   --panel: #ffffff;
   --panel-2: #f1f5f9;
   --panel-hi: #e2e8f0;
@@ -81,8 +88,9 @@
   --cyan: #0284c7;
   --slate: #475569;
   --card-border: #cbd5e1;
-  --card-shadow: 0 1px 3px rgba(15, 23, 42, .08), 0 4px 14px rgba(15, 23, 42, .04);
+  --card-shadow: 0 2px 8px rgba(15, 23, 42, .04);
   --topbar-border: #cbd5e1;
+  --topbar-mobile-bg: rgba(244, 246, 249, 0.88);
   --divider: #cbd5e1;
   --badge-border: #cbd5e1;
   --badge-bg: #ffffff;
@@ -124,6 +132,7 @@ html {
 body {
   margin: 0;
   background: var(--bg-gradient);
+  background-size: var(--bg-size);
   color: var(--text);
   font-family: var(--sans);
   font-size: 13px;
@@ -176,7 +185,7 @@ body,
 .board-stage,
 .buzzer-dial,
 .toast {
-  transition: background-color 0.3s ease, background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.2s ease, box-shadow 0.25s ease;
 }
 
 button,
@@ -2614,25 +2623,138 @@ select {
   .footer>div { flex-wrap: wrap; }
 }
 
+/* Mobile-only helpers (hidden on desktop/tablet >= 640px) */
+.mobile-meta-strip,
+.mobile-overview-bar {
+  display: none;
+}
+
 @media(max-width:640px) {
-  .app-shell { padding: 0 14px; }
-  .topbar { height: 64px; gap: 10px; }
-  .brand { min-width: 0; gap: 8px; }
-  .brand-mark { width: 34px; height: 34px; }
-  .brand-mark svg { width: 26px; height: 26px; }
-  .brand-copy strong { font-size: 11px; }
-  .brand-copy small { font-size: 9.5px; }
-  .project-title { display: none; }
-  .connection-badge { min-width: 0; padding: 7px 10px; font-size: 9.5px; }
-  .theme-toggle { padding: 0 8px; height: 32px; font-size: 9.5px; }
+  .app-shell {
+    padding: 0 14px;
+  }
+
+  main {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 1. Sticky Compact Mobile Header */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    height: 60px;
+    gap: 8px;
+    margin: 0 -14px;
+    padding: 0 14px;
+    background: var(--topbar-mobile-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .brand { min-width: 0; gap: 8px; flex: 1; }
+  .brand-mark { width: 32px; height: 32px; flex: none; }
+  .brand-mark svg { width: 24px; height: 24px; }
+  .brand-copy strong { font-size: 10.5px; letter-spacing: .1em; }
+  .brand-copy small { display: none; }
+  .project-title,
+  .topbar-right .worker,
+  .topbar-right .clock-block {
+    display: none;
+  }
+  .topbar-right { gap: 8px; flex: none; }
+  .connection-badge { min-width: 0; padding: 6px 9px; font-size: 9px; white-space: nowrap; }
+  .theme-toggle {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+    justify-content: center;
+  }
   .theme-label { display: none; }
-  .masthead { padding: 20px 0 14px; flex-direction: column; align-items: flex-start; gap: 12px; }
-  .masthead h1 { font-size: 20px; }
-  .masthead .eyebrow { font-size: 9.5px; }
-  .clock-block { text-align: left; padding-right: 0; }
-  .clock-value { font-size: 14px; }
-  .clock-date, .clock-block .micro-label { font-size: 9px; }
-  .master-banner { min-height: auto; padding: 16px 14px; gap: 14px; flex-direction: column; align-items: flex-start; }
+
+  /* Collapsible secondary metadata strip below sticky header */
+  .mobile-meta-strip {
+    display: block;
+    margin: 8px 0 0;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: var(--card-shadow);
+  }
+  .mobile-meta-toggle {
+    width: 100%;
+    min-height: 40px;
+    padding: 6px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .mobile-meta-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    font: 600 11px var(--sans);
+  }
+  .mobile-meta-summary .worker-avatar {
+    width: 22px;
+    height: 22px;
+    font-size: 8.5px;
+    flex: none;
+  }
+  .mobile-meta-summary strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mobile-meta-summary .meta-dot { color: var(--faint); }
+  .mobile-meta-summary .clock-value {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .mobile-meta-chevron {
+    font-size: 12px;
+    color: var(--subtle);
+    transition: transform 0.2s ease;
+    flex: none;
+  }
+  .mobile-meta-toggle[aria-expanded="true"] .mobile-meta-chevron {
+    transform: rotate(180deg);
+  }
+  .mobile-meta-details {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 12px 10px;
+    border-top: 1px solid var(--line-soft);
+    padding-top: 8px;
+    font: 9px var(--mono);
+    letter-spacing: .06em;
+    color: var(--subtle);
+  }
+  .mobile-meta-details[hidden] { display: none; }
+
+  /* Compact masthead so Master Banner stays above the fold */
+  .masthead {
+    padding: 12px 0 10px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .masthead .eyebrow { display: none; }
+  .masthead h1 { font-size: 17px; margin: 0; }
+  .node-chip-badge { padding: 4px 8px; font-size: 8px; }
+  .chip-sep, .chip-core { display: none; }
+
+  .master-banner { min-height: auto; padding: 14px; gap: 12px; flex-direction: column; align-items: flex-start; }
   .master-banner .banner-state {
     width: 100%;
     border-left: none;
@@ -2644,43 +2766,309 @@ select {
     justify-content: space-between;
     align-items: center;
   }
-  .banner-icon { width: 42px; height: 42px; }
-  .banner-icon svg { width: 24px; height: 24px; }
-  .banner-copy h2 { font-size: 14px; }
+  .banner-icon { width: 38px; height: 38px; }
+  .banner-icon svg { width: 22px; height: 22px; }
+  .banner-copy h2 { font-size: 13.5px; }
   .banner-copy p { font-size: 11px; }
-  .banner-kicker { font-size: 9.5px; }
+  .banner-kicker { font-size: 9px; }
   .banner-state strong { font-size: 11.5px; }
   .banner-state small { font-size: 9px; }
+
   .section-heading { flex-direction: column; align-items: flex-start; gap: 8px; }
   .section-heading>div:first-child { gap: 8px; }
   .section-heading h2 { font-size: 13.5px; }
   .sample-meta { font-size: 9.5px; gap: 6px; }
   .meta-separator { margin: 0 2px; }
+
+  /* 2. Mobile Compact Telemetry Overview Bar */
+  .mobile-overview-bar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 14px;
+  }
+  .mobile-overview-cell {
+    padding: 10px 8px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: var(--card-shadow);
+    text-align: center;
+    min-width: 0;
+  }
+  .mobile-overview-cell span {
+    display: block;
+    font: 8.5px var(--mono);
+    letter-spacing: .08em;
+    color: var(--subtle);
+    margin-bottom: 4px;
+  }
+  .mobile-overview-cell strong {
+    display: block;
+    font: 700 15px/1.1 var(--mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .metric-grid { grid-template-columns: 1fr; gap: 14px; }
-  .metric-card { min-height: auto; padding: 18px 16px; }
-  .temperature-layout { gap: 12px; }
-  .gauge-wrap { width: 135px; }
-  .temperature-gauge { width: 135px; height: 135px; }
-  .big-value { font-size: 32px; }
+  .metric-card { min-height: auto; padding: 16px 14px; }
+
+  /* Temperature Card: 120x120 gauge + 2-column stats */
+  .temperature-layout {
+    gap: 12px;
+    align-items: center;
+  }
+  .gauge-wrap { width: 120px; flex: none; }
+  .temperature-gauge { width: 120px; height: 120px; }
+  .temperature-readout { min-width: 0; flex: 1; }
+  .big-value { font-size: 28px; }
+  .threshold-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 8px;
+  }
+  .sparkline-head {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 8px;
+    align-items: center;
+  }
+  .sparkline-head > span:last-child { text-align: right; }
+
   .gas-readout { margin-top: 14px; }
   .gas-legend { font-size: 9px; flex-wrap: wrap; gap: 6px; }
+
+  /* Actuator Hardware Twin: 2 clean rows */
+  .board-stage {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+  .board-board {
+    width: 100%;
+    height: auto;
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .board-label {
+    position: static;
+    flex: none;
+  }
+  .board-circuit,
+  .board-chip,
+  .board-edge {
+    display: none;
+  }
+  .led-stack {
+    position: static;
+    flex-direction: row;
+    gap: 12px;
+    margin-left: auto;
+  }
+  .hardware-led.green.active { box-shadow: 0 0 12px rgba(34, 197, 94, .75); }
+  .hardware-led.amber.active { box-shadow: 0 0 12px rgba(244, 183, 64, .75); }
+  .hardware-led.red.active { box-shadow: 0 0 14px rgba(240, 68, 82, .85); }
+
+  .buzzer-module {
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    background: var(--panel-2);
+    gap: 10px;
+  }
+  .buzzer-dial { width: 32px; height: 32px; flex: none; margin: 0; }
+  .buzzer-module strong { margin: 0; font-size: 10.5px; }
+  .buzzer-module small { margin-left: auto; font-size: 9px; }
+
+  .actuator-footer {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    background: var(--panel-2);
+    margin-top: 10px;
+  }
+
+  /* 3. Section 02 & 04: Mobile Log Cards + 44px Controls */
   .operations-grid { grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
-  .panel { padding: 18px 16px; min-height: auto; }
+  .panel { padding: 16px 14px; min-height: auto; }
   .panel-heading { flex-direction: column; align-items: flex-start; gap: 10px; }
   .panel-heading p { font-size: 10.5px; margin: 4px 0 0 0; }
   .panel-titleline h2 { font-size: 13.5px; }
-  .log-actions { width: 100%; justify-content: space-between; }
-  .filter-wrap { flex: 1; }
-  .filter-wrap select { width: 100%; max-width: none; font-size: 10px; height: 32px; }
-  .icon-button { font-size: 10px; height: 32px; padding: 0 8px; }
-  .table-scroll { overflow-x: auto; width: 100%; max-height: 200px; -webkit-overflow-scrolling: touch; }
-  .table-scroll th, .table-scroll td { padding: 8px 10px; font-size: 10.5px; }
-  .table-scroll td:first-child, .table-scroll td:nth-child(4) { font-size: 10px; }
+
+  .log-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .filter-wrap {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .filter-wrap select {
+    width: 100%;
+    max-width: none;
+    height: 44px;
+    font-size: 11px;
+  }
+  .log-actions .icon-button {
+    flex: 1 1 calc(50% - 4px);
+    height: 44px;
+    justify-content: center;
+    font-size: 11px;
+  }
+  .panel-heading > .icon-button {
+    width: 100%;
+    height: 44px;
+    justify-content: center;
+    font-size: 11px;
+  }
+
+  .table-scroll {
+    overflow-x: visible;
+    overflow-y: auto;
+    max-height: 360px;
+  }
+  .table-scroll table,
+  .table-scroll tbody {
+    display: block;
+    width: 100%;
+    white-space: normal;
+  }
+  .table-scroll thead {
+    display: none;
+  }
+  .table-scroll tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 6px 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    background: var(--panel-2);
+  }
+  .table-scroll td {
+    display: block;
+    padding: 0;
+    border-bottom: 0;
+    font-size: 11px;
+    min-width: 0;
+  }
+  .table-scroll td.empty-row {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 12px 0;
+  }
+
+  /* Incident Log Card Layout */
+  #incidentRows tr {
+    grid-template-columns: 1fr auto;
+  }
+  #incidentRows td:nth-child(1) { grid-column: 1; grid-row: 1; font-size: 10px; color: var(--subtle); }
+  #incidentRows td:nth-child(4) { grid-column: 1; grid-row: 2; font-size: 10px; color: var(--subtle); }
+  #incidentRows td:nth-child(4)::before { content: "PKT #"; color: var(--faint); }
+  #incidentRows td:nth-child(2) { grid-column: 2; grid-row: 1 / span 2; align-self: start; justify-self: end; }
+  #incidentRows td:nth-child(3) { grid-column: 1 / -1; grid-row: 3; font-size: 11.5px; line-height: 1.4; }
+
+  /* Telemetry Sample Log Card Layout */
+  #telemetryLogRows tr {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+  #telemetryLogRows td:nth-child(1) {
+    grid-column: 1 / 3;
+    grid-row: 1;
+    font-size: 10px;
+    color: var(--subtle);
+  }
+  #telemetryLogRows td:nth-child(2) {
+    grid-column: 1 / 3;
+    grid-row: 1;
+    justify-self: end;
+    font-size: 10px;
+    color: var(--subtle);
+  }
+  #telemetryLogRows td:nth-child(2)::before { content: "#"; color: var(--faint); }
+  #telemetryLogRows td:nth-child(6) {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+    align-self: center;
+    font-size: 9.5px;
+    text-align: right;
+  }
+  #telemetryLogRows td:nth-child(3),
+  #telemetryLogRows td:nth-child(4),
+  #telemetryLogRows td:nth-child(5) {
+    grid-row: 2;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--panel);
+    border: 1px solid var(--line-soft);
+    font: 600 12px var(--mono);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  #telemetryLogRows td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font: 8px var(--mono);
+    letter-spacing: .06em;
+    color: var(--subtle);
+    margin-bottom: 3px;
+  }
+
   .panel-foot { font-size: 9.5px; flex-direction: column; align-items: flex-start; gap: 6px; }
-  .node-stats { gap: 12px 10px; }
+
+  /* 4. Section 03: Node Link Diagnostics 2-column grid + full-width Serial */
+  .node-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 10px;
+  }
+  .node-stats > div:last-child {
+    grid-column: 1 / -1;
+  }
+  .node-stats > div:last-child strong {
+    white-space: normal;
+    word-break: break-word;
+  }
   .node-stats>div>span { font-size: 8.5px; }
   .node-stats>div>strong { font-size: 11px; }
+
+  /* 5. Footer & Floating Audio Button Safe-Area Polish */
   .footer { font-size: 9.5px; }
+  .footer-sep { display: none; }
+  .audio-button {
+    position: fixed;
+    right: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 35;
+    min-height: 44px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+  }
+  .toast {
+    right: 14px;
+    left: 14px;
+    max-width: none;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* Web Serial Direct Button */

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090c11">
+  <meta name="theme-color" content="#0b0f19">
   <meta name="description" content="Industrial Worker Safety Monitoring and Real-Time Hazard Alert System for NXP FRDM-RW612 edge safety node.">
   <title>RW612 Safety Node | Mission Control Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="/static/safety-mark.svg">
@@ -69,6 +69,23 @@
       </div>
     </header>
 
+    <!-- Mobile Secondary Metadata Strip (< 640px) -->
+    <div class="mobile-meta-strip" id="mobileMetaStrip">
+      <button class="mobile-meta-toggle" id="mobileMetaToggle" type="button" aria-expanded="false" aria-controls="mobileMetaDetails">
+        <span class="mobile-meta-summary">
+          <span class="worker-avatar">YC</span>
+          <strong>Yajnesh C B</strong>
+          <span class="meta-dot">·</span>
+          <time id="liveClockMobile" class="clock-value">--:--:-- --</time>
+        </span>
+        <span class="mobile-meta-chevron" aria-hidden="true">▾</span>
+      </button>
+      <div class="mobile-meta-details" id="mobileMetaDetails" hidden>
+        <span>DEPT: ECE · PLANT FLOOR</span>
+        <span id="liveDateMobile">---</span>
+      </div>
+    </div>
+
     <!-- Main Workspace -->
     <main>
       <!-- Masthead -->
@@ -124,6 +141,22 @@
             <span>LAST SAMPLE <b id="sampleAge">—</b></span>
             <span class="meta-separator"></span>
             <span>PACKETS <b id="packetCount">—</b></span>
+          </div>
+        </div>
+
+        <!-- Mobile Compact Telemetry Overview Bar (< 640px) -->
+        <div class="mobile-overview-bar" id="mobileOverviewBar" aria-label="Quick telemetry overview">
+          <div class="mobile-overview-cell">
+            <span>TEMP °C</span>
+            <strong id="mobileTempValue">—</strong>
+          </div>
+          <div class="mobile-overview-cell">
+            <span>MOTION g</span>
+            <strong id="mobileAccelValue">—</strong>
+          </div>
+          <div class="mobile-overview-cell">
+            <span>GAS INDEX</span>
+            <strong id="mobileGasValue">—</strong>
           </div>
         </div>
 

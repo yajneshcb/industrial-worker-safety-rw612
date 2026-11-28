@@ -7,7 +7,7 @@
   <meta name="description" content="Industrial Worker Safety Monitoring and Real-Time Hazard Alert System for NXP FRDM-RW612 edge safety node.">
   <title>RW612 Safety Node | Mission Control Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="/static/safety-mark.svg">
-  <link rel="stylesheet" href="/static/css/dashboard.css?v=usb-live-20261127">
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=edge-20261128">
 </head>
 <body>
   <div class="app-shell">
@@ -101,46 +101,90 @@
         </div>
       </section>
 
-      <!-- Master Safety Banner (Defaults to OFFLINE until valid hardware telemetry arrives) -->
+      <!-- Unified Edge Safety & Fault-Tolerance Hero Banner -->
       <section id="masterBanner" class="master-banner state-offline" aria-live="assertive" aria-atomic="true">
-        <div class="banner-icon" aria-hidden="true">
-          <svg class="shield-icon" viewBox="0 0 24 24" fill="none">
-            <path d="M12 3 20 6v5.7c0 4.8-3.3 8.3-8 9.8-4.7-1.5-8-5-8-9.8V6l8-3Z" stroke="currentColor" stroke-width="1.5"/>
-            <path d="m8.5 12.2 2.3 2.3 4.8-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <svg class="offline-icon" viewBox="0 0 24 24" fill="none">
-            <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <svg class="siren-icon" viewBox="0 0 24 24" fill="none">
-            <path d="M5 17h14l-1.5-8a5.6 5.6 0 0 0-11 0L5 17Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-            <path d="M3 20h18M12 2V0M4 5 2.5 3.5M20 5l1.5-1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
-          </svg>
+        <div class="banner-primary">
+          <div class="banner-icon" aria-hidden="true">
+            <svg class="shield-icon" viewBox="0 0 24 24" fill="none">
+              <path d="M12 3 20 6v5.7c0 4.8-3.3 8.3-8 9.8-4.7-1.5-8-5-8-9.8V6l8-3Z" stroke="currentColor" stroke-width="1.5"/>
+              <path d="m8.5 12.2 2.3 2.3 4.8-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg class="offline-icon" viewBox="0 0 24 24" fill="none">
+              <path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <svg class="siren-icon" viewBox="0 0 24 24" fill="none">
+              <path d="M5 17h14l-1.5-8a5.6 5.6 0 0 0-11 0L5 17Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M3 20h18M12 2V0M4 5 2.5 3.5M20 5l1.5-1.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="banner-copy">
+            <div class="banner-kicker-row">
+              <span class="banner-kicker" id="bannerKicker">EDGE CLASSIFIER STANDBY</span>
+              <span class="edge-autonomy-badge" title="On-device detection and local LED/buzzer alerts remain active even when Wi-Fi/USB link is disconnected">
+                <i class="autonomy-dot"></i>
+                LOCAL EDGE LOGIC: ACTIVE
+              </span>
+            </div>
+            <h2 id="bannerTitle">NODE OFFLINE — AWAITING SENSOR TELEMETRY</h2>
+            <p id="bannerDetail">On-device hazard classification and local LED/buzzer alerts stay active even if Wi-Fi or USB link drops.</p>
+          </div>
         </div>
-        <div class="banner-copy">
-          <span class="banner-kicker" id="bannerKicker">EDGE CLASSIFIER STANDBY</span>
-          <h2 id="bannerTitle">NODE OFFLINE — AWAITING SENSOR TELEMETRY</h2>
-          <p id="bannerDetail">Awaiting real-time telemetry over Wi-Fi / USB VCOM.</p>
-        </div>
-        <div class="banner-state">
-          <span class="state-light"></span>
-          <strong id="stateLabel">OFFLINE</strong>
-          <small>SAFETY STATE</small>
+
+        <!-- Compact Hardware Twin Mirror -->
+        <div class="hero-twin-mirror" id="cardActuator" aria-label="Hardware Twin Mirror">
+          <div class="twin-leds" title="Physical FRDM-RW612 status LEDs">
+            <span class="twin-sub-label">BOARD LEDS</span>
+            <div class="led-stack">
+              <div class="led-unit"><i id="ledNormal" class="hardware-led green"></i><span>SAFE</span></div>
+              <div class="led-unit"><i id="ledWarning" class="hardware-led amber"></i><span>WARN</span></div>
+              <div class="led-unit"><i id="ledEmergency" class="hardware-led red"></i><span>ALARM</span></div>
+            </div>
+          </div>
+
+          <div class="twin-buzzer">
+            <div class="buzzer-dial" id="buzzerVisual">
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <div class="twin-buzzer-copy">
+              <span class="twin-sub-label">ACTIVE BUZZER</span>
+              <strong id="buzzerStatus">OFF</strong>
+              <small id="buzzerMode">AWAITING LINK</small>
+            </div>
+          </div>
+
+          <div class="twin-queue">
+            <span class="twin-sub-label">OFFLINE QUEUE</span>
+            <strong id="heroQueueCount">0 <small>PKTS</small></strong>
+            <span class="twin-actuator-pill">ACTUATOR: <b id="actuatorState" class="offline">OFFLINE</b></span>
+          </div>
+
+          <div class="banner-state">
+            <span class="state-light"></span>
+            <strong id="stateLabel">OFFLINE</strong>
+            <small>SAFETY STATE</small>
+          </div>
         </div>
       </section>
 
-      <!-- Section 01: Live Telemetry Cards -->
-      <section class="telemetry-section" aria-labelledby="telemetryHeading">
+      <!-- Section 01: 4-Hazard Live Sensor Grid -->
+      <section class="telemetry-section" id="telemetrySection" aria-labelledby="telemetryHeading">
         <div class="section-heading">
           <div>
             <span class="section-index">01</span>
-            <h2 id="telemetryHeading">Live telemetry</h2>
-            <span class="section-note">EDGE SENSOR ARRAY <b>·</b> 1s STREAM REFRESH</span>
+            <h2 id="telemetryHeading">Live hazard &amp; sensor array</h2>
+            <span class="section-note">4-HAZARD EDGE ARCHITECTURE <b>·</b> 1s STREAM</span>
           </div>
-          <div class="sample-meta">
-            <span class="pulse-ring"></span>
-            <span>LAST SAMPLE <b id="sampleAge">—</b></span>
-            <span class="meta-separator"></span>
-            <span>PACKETS <b id="packetCount">—</b></span>
+          <div class="section-controls">
+            <button class="tech-specs-toggle" id="techSpecsToggle" type="button" aria-pressed="false">
+              <span class="toggle-dot"></span>
+              <span>SHOW TECHNICAL SPECS</span>
+            </button>
+            <div class="sample-meta">
+              <span class="pulse-ring"></span>
+              <span>LAST SAMPLE <b id="sampleAge">—</b></span>
+              <span class="meta-separator"></span>
+              <span>PACKETS <b id="packetCount">—</b></span>
+            </div>
           </div>
         </div>
 
@@ -161,52 +205,70 @@
         </div>
 
         <div class="metric-grid">
-          <!-- Card 1: Ambient Temperature -->
+          <!-- Card 1: Ambient Temperature (P3T1755) -->
           <article class="metric-card temperature-card" id="cardTemperature">
             <div class="card-head">
               <div class="card-title-wrap">
                 <span class="metric-icon temp-icon">°</span>
                 <div>
                   <h3>Ambient temperature</h3>
-                  <span class="card-subtitle">P3T1755 DIGITAL SENSOR · I²C</span>
+                  <span class="card-subtitle">P3T1755 SENSOR</span>
                 </div>
               </div>
               <span class="mini-state" id="temperatureState">NO SIGNAL</span>
             </div>
-            <div class="temperature-layout">
-              <div class="gauge-wrap" role="img" aria-label="Temperature gauge from 0 to 60 degrees Celsius">
-                <svg class="temperature-gauge" viewBox="0 0 160 160">
-                  <circle class="gauge-track" cx="80" cy="80" r="61"/>
-                  <circle class="gauge-threshold warning" cx="80" cy="80" r="61"/>
-                  <circle class="gauge-threshold critical" cx="80" cy="80" r="61"/>
-                  <circle id="temperatureArc" class="gauge-value" cx="80" cy="80" r="61"/>
-                  <text x="80" y="77" class="gauge-number" id="temperatureGaugeValue">—</text>
-                  <text x="80" y="99" class="gauge-unit">DEG C</text>
-                  <text x="18" y="88" class="gauge-tick">0</text>
-                  <text x="142" y="88" class="gauge-tick">60</text>
-                </svg>
+
+            <div class="sensor-primary-readout">
+              <div class="big-value hero-num">
+                <span id="temperatureValue">—</span>
+                <small>°C</small>
               </div>
-              <div class="temperature-readout">
-                <div class="big-value">
-                  <span id="temperatureValue">—</span>
-                  <small>°C</small>
-                </div>
-                <div class="threshold-row">
-                  <span><i class="threshold-dot warning-dot"></i>WARN <b>40°</b></span>
-                  <span><i class="threshold-dot critical-dot"></i>CRITICAL <b>50°</b></span>
-                </div>
-                <div class="sparkline-box">
-                  <div class="sparkline-head">
-                    <span>RECENT TREND</span>
-                    <span>MIN <b id="temperatureMin">—</b> <i>/</i> MAX <b id="temperatureMax">—</b></span>
-                  </div>
-                  <svg class="sparkline" id="temperatureSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent temperature trend"></svg>
-                </div>
+              <div class="min-max-pills">
+                <span class="stat-pill">MIN <b id="temperatureMin">—</b></span>
+                <span class="stat-pill">MAX <b id="temperatureMax">—</b></span>
               </div>
             </div>
+
+            <!-- Segmented Threshold Bar -->
+            <div class="temp-meter" role="img" aria-label="Temperature threshold bar: Safe under 40°C, Warn 40°C, Critical 50°C">
+              <div class="temp-segments">
+                <span class="seg-safe"></span>
+                <span class="seg-warn"></span>
+                <span class="seg-crit"></span>
+              </div>
+              <div class="temp-progress-track">
+                <div class="temp-progress-fill" id="tempBarFill"></div>
+              </div>
+              <div class="threshold-row">
+                <span><i class="threshold-dot safe-dot"></i>SAFE <b>&lt;40°</b></span>
+                <span><i class="threshold-dot warning-dot"></i>WARN <b>40°</b></span>
+                <span><i class="threshold-dot critical-dot"></i>CRIT <b>50°</b></span>
+              </div>
+            </div>
+
+            <div class="sparkline-box">
+              <div class="sparkline-head">
+                <span>RECENT TREND</span>
+                <span>LIMIT <b>40°C / 50°C</b></span>
+              </div>
+              <svg class="sparkline" id="temperatureSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent temperature trend"></svg>
+            </div>
+
+            <details class="card-specs">
+              <summary>SPECIFICATIONS</summary>
+              <div class="card-specs-body">
+                <span>P3T1755 · I²C 0x48 · 0–60°C RANGE · 0.0625°C RES</span>
+              </div>
+            </details>
+
+            <!-- Preserved SVG IDs for JS compatibility -->
+            <svg class="sr-only" aria-hidden="true" viewBox="0 0 160 160">
+              <circle id="temperatureArc" class="gauge-value" fill="none" cx="80" cy="80" r="61"/>
+              <text x="80" y="77" id="temperatureGaugeValue">—</text>
+            </svg>
           </article>
 
-          <!-- Card 2: Motion & Impact -->
+          <!-- Card 2: Motion & Fall Detection (MPU-6050) -->
           <article class="metric-card motion-card" id="cardMotion">
             <div class="card-head">
               <div class="card-title-wrap">
@@ -217,25 +279,24 @@
                   </svg>
                 </span>
                 <div>
-                  <h3>Motion &amp; impact</h3>
+                  <h3>Motion &amp; fall detection</h3>
                   <span class="card-subtitle">MPU-6050 · 6-AXIS IMU</span>
                 </div>
               </div>
-              <span class="event-counter"><b id="fallCount">—</b><small>FALL EVENTS</small></span>
+              <span class="event-counter"><b id="fallCount">—</b><small>FALLS</small></span>
             </div>
+
             <div class="motion-readout">
-              <div>
-                <span class="micro-label">ACCELERATION MAGNITUDE</span>
-                <div class="big-value">
-                  <span id="accelValue">—</span>
-                  <small>g</small>
-                </div>
+              <div class="big-value hero-num">
+                <span id="accelValue">—</span>
+                <small>g</small>
               </div>
               <div class="motion-condition" id="motionCondition">
                 <span class="condition-led"></span>
                 <span>NO SIGNAL</span>
               </div>
             </div>
+
             <div class="vector-list">
               <div class="vector-row">
                 <span class="axis-label axis-x">X</span>
@@ -256,16 +317,24 @@
                 <small>g</small>
               </div>
             </div>
+
             <div class="sparkline-box motion-spark">
               <div class="sparkline-head">
                 <span>IMPACT SIGNATURE</span>
-                <span>FREE-FALL &lt;0.4g <i>→</i> IMPACT &gt;2.5g</span>
+                <span>NORMAL <b>~1.0g</b></span>
               </div>
               <svg class="sparkline" id="motionSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent acceleration trend"></svg>
             </div>
+
+            <details class="card-specs">
+              <summary>SPECIFICATIONS</summary>
+              <div class="card-specs-body">
+                <span>MPU-6050 · I²C 0x68 · FREE-FALL &lt;0.4g → IMPACT &gt;2.5g</span>
+              </div>
+            </details>
           </article>
 
-          <!-- Card 3: Gas & Smoke -->
+          <!-- Card 3: Gas & Smoke Hazard (MQ-2) -->
           <article class="metric-card gas-card" id="cardGas">
             <div class="card-head">
               <div class="card-title-wrap">
@@ -276,90 +345,102 @@
                   </svg>
                 </span>
                 <div>
-                  <h3>Gas &amp; smoke</h3>
-                  <span class="card-subtitle">MQ-2 · SnO₂ LPADC CHANNEL</span>
+                  <h3>Gas &amp; smoke hazard</h3>
+                  <span class="card-subtitle">MQ-2 · SMOKE / LPG</span>
                 </div>
-              </div>
-              <span class="sensor-live" id="gasSensorLive"><i></i> LPADC</span>
-            </div>
-            <div class="gas-readout">
-              <div class="big-value">
-                <span id="gasValue">—</span>
-                <small>INDEX</small>
               </div>
               <span class="aqi-label" id="gasQuality">OFFLINE</span>
             </div>
-            <div class="gas-diagnostic" id="gasDiagnostic">ADC raw — · pin — V</div>
-            <div class="gas-meter" role="img" aria-label="Relative MQ-2 output index with demonstration warning at 300 and critical at 600">
+
+            <div class="gas-readout">
+              <div class="big-value hero-num">
+                <span id="gasValue">—</span>
+                <small>INDEX</small>
+              </div>
+              <span class="sensor-live" id="gasSensorLive"><i></i> LPADC</span>
+            </div>
+
+            <div class="gas-meter" role="img" aria-label="MQ-2 Gas Index with Safe under 700, Warn 700-849, Danger 850+">
               <div class="gas-zones"><i></i><i></i><i></i></div>
               <div class="gas-track">
-                <span class="gas-marker warning-marker"><b>300</b></span>
-                <span class="gas-marker critical-marker"><b>600</b></span>
+                <span class="gas-marker warning-marker"><b>700</b></span>
+                <span class="gas-marker critical-marker"><b>850</b></span>
                 <span id="gasNeedle" class="gas-needle"></span>
               </div>
               <div class="meter-scale">
                 <span>0</span>
                 <span>700 <em>WARN</em></span>
-                <span>850 <em>CRITICAL</em></span>
+                <span>850 <em>DANGER</em></span>
                 <span>1000</span>
               </div>
             </div>
+
             <div class="gas-legend">
               <span><i class="safe-swatch"></i>SAFE <b>&lt;700</b></span>
               <span><i class="warning-swatch"></i>WARN <b>700–849</b></span>
               <span><i class="danger-swatch"></i>DANGER <b>≥850</b></span>
             </div>
+
             <div class="sparkline-box gas-spark">
               <div class="sparkline-head">
                 <span>GAS TREND</span>
-                <span>DEMO LIMIT <b>700 INDEX</b></span>
+                <span>LIMIT <b>700 / 850</b></span>
               </div>
               <svg class="sparkline" id="gasSpark" viewBox="0 0 280 58" preserveAspectRatio="none" aria-label="Recent gas concentration trend"></svg>
             </div>
+
+            <details class="card-specs">
+              <summary>SPECIFICATIONS</summary>
+              <div class="card-specs-body">
+                <span>MQ-2 SnO₂ · LPADC J7-3</span>
+                <span id="gasDiagnostic">ADC raw — · pin — V</span>
+              </div>
+            </details>
           </article>
 
-          <!-- Card 4: Actuator Hardware Twin -->
-          <article class="metric-card actuator-card" id="cardActuator">
+          <!-- Card 4: Manual SOS Trigger (Onboard GPIO Button) -->
+          <article class="metric-card sos-card" id="cardSos">
             <div class="card-head">
               <div class="card-title-wrap">
-                <span class="metric-icon actuator-icon">
+                <span class="metric-icon sos-icon">
                   <svg viewBox="0 0 24 24" fill="none">
-                    <rect x="4" y="3" width="16" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M8 7h8M8 12h8M8 17h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M12 7v6M12 16.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                   </svg>
                 </span>
                 <div>
-                  <h3>Actuator hardware twin</h3>
-                  <span class="card-subtitle">FRDM-RW612 · PHYSICAL MIRROR</span>
+                  <h3>Manual SOS trigger</h3>
+                  <span class="card-subtitle">ONBOARD GPIO BUTTON</span>
                 </div>
               </div>
-              <span class="mirror-label">MIRROR</span>
+              <span class="mini-state" id="sosBadge">OFFLINE</span>
             </div>
-            <div class="board-stage">
-              <div class="board-board">
-                <div class="board-label">RW612 <span>NODE 01</span></div>
-                <div class="led-stack">
-                  <div class="led-unit"><i id="ledNormal" class="hardware-led green"></i><span>SAFE</span></div>
-                  <div class="led-unit"><i id="ledWarning" class="hardware-led amber"></i><span>WARN</span></div>
-                  <div class="led-unit"><i id="ledEmergency" class="hardware-led red"></i><span>ALARM</span></div>
-                </div>
-                <div class="board-circuit circuit-one"></div>
-                <div class="board-circuit circuit-two"></div>
-                <div class="board-chip">NXP<br><b>RW612</b></div>
-                <div class="board-edge"></div>
+
+            <div class="sos-status-box" id="sosStatusBox">
+              <div class="sos-pulse-ring" aria-hidden="true"></div>
+              <strong id="sosStatusTitle">OFFLINE</strong>
+              <span id="sosStatusSub">Awaiting FRDM-RW612 GPIO status</span>
+            </div>
+
+            <div class="sos-meta-grid">
+              <div class="sos-meta-cell">
+                <span>PRIORITY</span>
+                <b>IMMEDIATE</b>
               </div>
-              <div class="buzzer-module">
-                <div class="buzzer-dial" id="buzzerVisual">
-                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                </div>
-                <strong id="buzzerStatus">BUZZER OFF</strong>
-                <small id="buzzerMode">AWAITING LINK</small>
+              <div class="sos-meta-cell">
+                <span>LOCAL SIREN</span>
+                <b id="sosSirenState">STANDBY</b>
               </div>
             </div>
-            <div class="actuator-footer">
-              <span><i class="sync-icon"></i>ACTUATOR STATUS</span>
-              <b id="actuatorState" class="offline">OFFLINE</b>
-            </div>
+
+            <p class="sos-description" id="sosDetail">Pressing the physical user/boot button on the FRDM-RW612 node triggers an immediate local &amp; SCADA emergency.</p>
+
+            <details class="card-specs">
+              <summary>SPECIFICATIONS</summary>
+              <div class="card-specs-body">
+                <span>FRDM-RW612 GPIO · ACTIVE-LOW EDGE INTERRUPT</span>
+              </div>
+            </details>
           </article>
         </div>
       </section>
@@ -541,6 +622,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/static/js/dashboard.js?v=usb-live-20261127" defer></script>
+  <script src="/static/js/dashboard.js?v=edge-20261128" defer></script>
 </body>
 </html>

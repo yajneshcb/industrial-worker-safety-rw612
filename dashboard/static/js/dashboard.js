@@ -20,8 +20,8 @@
   };
 
   const themeColors = {
-    dark: { temperature: '#45d292', gas: '#55cbb1', motion: '#a193ff', pointStroke: '#101720', placeholder: '#334155' },
-    light: { temperature: '#16a34a', gas: '#0d9488', motion: '#7c3aed', pointStroke: '#ffffff', placeholder: '#cbd5e1' }
+    dark: { temperature: '#45d292', gas: '#55cbb1', motion: '#a193ff', pointStroke: '#101720', placeholder: '#94a3b8' },
+    light: { temperature: '#16a34a', gas: '#0d9488', motion: '#7c3aed', pointStroke: '#ffffff', placeholder: '#64748b' }
   };
 
   function getCurrentTheme() {
@@ -186,6 +186,10 @@
       $('#temperatureGaugeValue').textContent = '—';
       $('#temperatureArc').style.strokeDasharray = '0 383';
       $('#temperatureArc').setAttribute('class', 'gauge-value');
+      if ($('#tempBarFill')) {
+        $('#tempBarFill').style.width = '0%';
+        $('#tempBarFill').className = 'temp-progress-fill';
+      }
       $('#temperatureState').textContent = 'NO SIGNAL';
       $('#temperatureState').className = 'mini-state';
       $('#temperatureMin').textContent = '—';
@@ -221,15 +225,19 @@
       if ($('#mobileGasValue')) $('#mobileGasValue').textContent = '—';
       drawEmptySparkline($('#gasSpark'), 'Awaiting MQ-2 sensor link…');
 
-      // Section 01: Actuator Hardware Twin
+      // Section 01: Manual SOS Trigger card
+      renderSosCard(false, false);
+
+      // Hero Hardware Twin Mirror
       $('#ledNormal').className = 'hardware-led green';
       $('#ledWarning').className = 'hardware-led amber';
       $('#ledEmergency').className = 'hardware-led red';
       $('#buzzerVisual').className = 'buzzer-dial';
-      $('#buzzerStatus').textContent = 'BUZZER OFF';
+      $('#buzzerStatus').textContent = 'OFF';
       $('#buzzerMode').textContent = 'AWAITING LINK';
       $('#actuatorState').textContent = 'OFFLINE';
       $('#actuatorState').className = 'offline';
+      if ($('#heroQueueCount')) $('#heroQueueCount').innerHTML = '0 <small>PKTS</small>';
 
       // Section 02: Incident Log
       renderIncidents(data.incidents || []);
@@ -272,11 +280,12 @@
 
     // Banner
     banner.className = `master-banner state-${safety.toLowerCase()}`;
+    const hazardLabel = hazard && hazard !== 'NONE' ? hazard.replaceAll('_', ' ') : 'ACTIVE HAZARD';
     $('#stateLabel').textContent = safety;
     const banners = {
-      NORMAL: ['EDGE CLASSIFIER ONLINE', 'SYSTEM NORMAL — ALL WORKER PARAMETERS SECURE', 'No active hazards detected. Continuous telemetry is monitored locally and mirrored here.'],
-      WARNING: ['ADVISORY · OPERATOR ATTENTION', 'ADVISORY WARNING — ELEVATED HAZARD DETECTED', detailFor(hazard)],
-      EMERGENCY: ['CRITICAL · IMMEDIATE RESPONSE', 'CRITICAL EMERGENCY — IMMEDIATE ACTION REQUIRED', detailFor(hazard)]
+      NORMAL: ['EDGE CLASSIFIER ONLINE', 'NORMAL — ALL 4 HAZARD CHANNELS CLEAR', 'On-device classification is active. Continuous telemetry is mirrored here over Wi-Fi / USB.'],
+      WARNING: ['ADVISORY · OPERATOR ATTENTION', `WARNING — ${hazardLabel}`, detailFor(hazard)],
+      EMERGENCY: ['CRITICAL · IMMEDIATE RESPONSE', `EMERGENCY — ${hazardLabel}`, detailFor(hazard)]
     };
     const copy = banners[safety];
     $('#bannerKicker').textContent = copy[0];
@@ -294,6 +303,10 @@
     arc.style.strokeDasharray = `${(gaugeLength * tempPercent / 100).toFixed(1)} ${circumference.toFixed(1)}`;
     arc.setAttribute('class', `gauge-value${temp >= 50 ? ' emergency' : temp >= 40 ? ' warning' : ''}`);
     const tempCondition = temp >= 50 ? 'emergency' : temp >= 40 ? 'warning' : 'normal';
+    if ($('#tempBarFill')) {
+      $('#tempBarFill').style.width = `${tempPercent.toFixed(1)}%`;
+      $('#tempBarFill').className = `temp-progress-fill ${tempCondition}`;
+    }
     $('#temperatureState').textContent = temp >= 50 ? 'CRITICAL' : temp >= 40 ? 'WARNING' : 'NORMAL';
     $('#temperatureState').className = `mini-state ${tempCondition}`;
     $('#temperatureMin').textContent = data.temperature_min_c !== null ? `${fmt(data.temperature_min_c, 1)}°` : '—';
@@ -312,8 +325,9 @@
     $('#fallCount').textContent = data.fall_event_count ?? 0;
     const motionCondition = $('#motionCondition');
     const impact = !mpuFault && (accel > 2.5 || hazard === 'FALL_DETECTED');
-    motionCondition.className = `motion-condition ${mpuFault ? 'impact' : impact ? 'impact' : 'stable'}`;
-    motionCondition.lastElementChild.textContent = mpuFault ? 'I2C FAULT (0x68)' : (impact ? 'IMPACT EVENT' : 'STABLE');
+    const freeFall = !mpuFault && !impact && accel < 0.4;
+    motionCondition.className = `motion-condition ${mpuFault || impact ? 'impact' : freeFall ? 'warning' : 'stable'}`;
+    motionCondition.lastElementChild.textContent = mpuFault ? 'I2C FAULT (0x68)' : (impact ? 'FALL IMPACT' : freeFall ? 'FREE-FALL' : 'STABLE');
 
     // Card 3: Gas
     const gas = Number(data.gas_ppm || 0);
@@ -338,7 +352,8 @@
     if ($('#mobileAccelValue')) $('#mobileAccelValue').textContent = mpuFault ? 'FAULT' : `${fmt(accel, 2)}g`;
     if ($('#mobileGasValue')) $('#mobileGasValue').textContent = gasFault ? 'FAULT' : fmt(gas, gas % 1 ? 1 : 0);
 
-    // Card 4: Actuator Mirror
+    // Card 4: Manual SOS Trigger + Hero Hardware Twin
+    renderSosCard(true, hazard === 'MANUAL_SOS');
     renderActuators(data);
 
     // Section 02 & 03
@@ -380,6 +395,47 @@
     return copy[hazard] || `Active hazard reported by the edge node: ${hazard}.`;
   }
 
+  function renderSosCard(isOnline, isTriggered) {
+    const card = $('#cardSos');
+    const badge = $('#sosBadge');
+    const box = $('#sosStatusBox');
+    const title = $('#sosStatusTitle');
+    const sub = $('#sosStatusSub');
+    const siren = $('#sosSirenState');
+    const detail = $('#sosDetail');
+    if (!card || !badge || !box || !title || !sub) return;
+
+    card.classList.toggle('sos-triggered', Boolean(isOnline && isTriggered));
+    box.classList.toggle('triggered', Boolean(isOnline && isTriggered));
+    box.classList.toggle('armed', Boolean(isOnline && !isTriggered));
+
+    if (!isOnline) {
+      badge.textContent = 'OFFLINE';
+      badge.className = 'mini-state';
+      title.textContent = 'OFFLINE';
+      sub.textContent = 'Awaiting FRDM-RW612 GPIO status';
+      if (siren) siren.textContent = 'STANDBY';
+      if (detail) detail.textContent = 'Pressing the physical user/boot button on the FRDM-RW612 node triggers an immediate local & SCADA emergency.';
+      return;
+    }
+
+    if (isTriggered) {
+      badge.textContent = 'TRIGGERED';
+      badge.className = 'mini-state emergency';
+      title.textContent = 'SOS TRIGGERED';
+      sub.textContent = 'Manual emergency activated from FRDM-RW612 button';
+      if (siren) siren.textContent = 'ALARMING';
+      if (detail) detail.textContent = 'Worker triggered manual emergency SOS. Dispatch response team and verify worker safety immediately.';
+    } else {
+      badge.textContent = 'ARMED';
+      badge.className = 'mini-state normal';
+      title.textContent = 'ARMED / READY';
+      sub.textContent = 'No manual SOS pressed on node';
+      if (siren) siren.textContent = 'STANDBY';
+      if (detail) detail.textContent = 'Physical user/boot button on FRDM-RW612 is armed for one-press emergency override.';
+    }
+  }
+
   function renderActuators(data) {
     const normal = $('#ledNormal'), warning = $('#ledWarning'), emergency = $('#ledEmergency');
     normal.className = `hardware-led green${data.led_normal ? ' active' : ''}`;
@@ -388,12 +444,17 @@
 
     const buzzer = $('#buzzerVisual');
     buzzer.className = `buzzer-dial${data.safety_state === 'EMERGENCY' ? ' active' : data.safety_state === 'WARNING' ? ' warning' : ''}`;
-    $('#buzzerStatus').textContent = data.buzzer_active ? 'BUZZER ACTIVE' : 'BUZZER OFF';
+    $('#buzzerStatus').textContent = data.buzzer_active ? 'SOUNDING' : 'OFF';
     $('#buzzerMode').textContent = data.buzzer_mode === 'WARNING_BEEP_200MS' ? '200MS WARNING BEEP' : data.buzzer_mode === 'CONTINUOUS_RAPID_ALARM' ? 'CONTINUOUS RAPID ALARM' : 'OUTPUT IDLE';
 
     const actuator = $('#actuatorState');
     actuator.textContent = data.safety_state === 'EMERGENCY' ? 'EMERGENCY' : data.safety_state === 'WARNING' ? 'WARNING' : 'NOMINAL';
     actuator.className = data.safety_state === 'EMERGENCY' ? 'emergency' : data.safety_state === 'WARNING' ? 'warning' : 'nominal';
+
+    const queued = Math.max(0, Number(data.offline_queue_count || 0));
+    if ($('#heroQueueCount')) {
+      $('#heroQueueCount').innerHTML = `${queued} <small>PKTS</small>`;
+    }
   }
 
   function renderLink(data) {
@@ -598,6 +659,27 @@
         const expanded = mobileMetaToggle.getAttribute('aria-expanded') === 'true';
         mobileMetaToggle.setAttribute('aria-expanded', String(!expanded));
         mobileMetaDetails.hidden = expanded;
+      });
+    }
+
+    const techSpecsToggle = $('#techSpecsToggle');
+    const telemetrySection = $('#telemetrySection');
+    if (techSpecsToggle && telemetrySection) {
+      const applyTechSpecs = (enabled) => {
+        telemetrySection.classList.toggle('show-tech-specs', enabled);
+        telemetrySection.querySelectorAll('.card-specs').forEach((el) => {
+          el.open = enabled;
+        });
+        techSpecsToggle.setAttribute('aria-pressed', String(enabled));
+        techSpecsToggle.classList.toggle('active', enabled);
+      };
+      let savedSpecs = false;
+      try { savedSpecs = localStorage.getItem('rw612-tech-specs') === '1'; } catch (_) { }
+      applyTechSpecs(savedSpecs);
+      techSpecsToggle.addEventListener('click', () => {
+        const next = !telemetrySection.classList.contains('show-tech-specs');
+        applyTechSpecs(next);
+        try { localStorage.setItem('rw612-tech-specs', next ? '1' : '0'); } catch (_) { }
       });
     }
 
